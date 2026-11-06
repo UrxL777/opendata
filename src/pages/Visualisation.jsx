@@ -10,7 +10,7 @@ const CATEGORIES = [
 function PanneauAffichage({ visu }) {
   if (!visu) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-gray-200 min-h-[300px] md:min-h-[500px]">
+      <div className="flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-gray-200 min-h-[400px]">
         <FileImage size={48} className="text-gray-200 mb-3" />
         <p className="text-gray-400 text-sm">Sélectionnez une visualisation</p>
       </div>
@@ -22,8 +22,7 @@ function PanneauAffichage({ visu }) {
   const estLien  = !!visu.lien_url
 
   return (
-    <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden min-h-[300px] md:min-h-[500px]">
-      {/* En-tête du panneau */}
+    <div className="flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden min-h-[400px]">
       <div className="px-4 py-3 border-b border-gray-100">
         <h2 className="font-semibold text-gray-800 text-base">{visu.titre}</h2>
         {visu.categorie && (
@@ -33,23 +32,20 @@ function PanneauAffichage({ visu }) {
         )}
       </div>
 
-      {/* Zone graphique */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1" style={{ minHeight: '400px' }}>
         {estEmbed ? (
-          <div
-            className="w-full h-full"
-            style={{ minHeight: '300px' }}
-            dangerouslySetInnerHTML={{ __html: visu.code_embed }}
-          />
+          <div className="w-full h-full" style={{ minHeight: '400px' }}>
+            <style>{`.zone-embed iframe { width: 100% !important; min-height: 400px; height: 100%; }`}</style>
+            <div className="zone-embed w-full h-full" dangerouslySetInnerHTML={{ __html: visu.code_embed }} />
+          </div>
         ) : estImage ? (
           <img src={visu.url_fichier} alt={visu.titre} className="w-full h-full object-contain p-4" />
         ) : estLien ? (
           <iframe
             src={visu.lien_url}
             title={visu.titre}
-            className="w-full h-full border-0"
-            style={{ minHeight: '300px' }}
-            allowFullScreen
+            className="w-full border-0"
+            style={{ minHeight: '400px', height: '500px' }}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-300 py-10">
@@ -58,7 +54,6 @@ function PanneauAffichage({ visu }) {
         )}
       </div>
 
-      {/* Description */}
       {visu.description && (
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
           <p className="text-xs text-gray-500">{visu.description}</p>
@@ -80,9 +75,8 @@ export default function Visualisation() {
       .from('visualisations')
       .select('*')
       .order('cree_le', { ascending: false })
-    const resultats = data ?? []
-    setVisualisations(resultats)
-    if (resultats.length > 0) setVisuSelectionnee(resultats[0])
+    setVisualisations(data ?? [])
+    setVisuSelectionnee(null)
     setChargement(false)
   }
 
@@ -96,7 +90,7 @@ export default function Visualisation() {
 
   useEffect(() => {
     if (visuSelectionnee && !visuFiltrees.find(v => v.id === visuSelectionnee.id)) {
-      setVisuSelectionnee(visuFiltrees[0] ?? null)
+      setVisuSelectionnee(null)
     }
   }, [visuFiltrees])
 
@@ -104,7 +98,6 @@ export default function Visualisation() {
     <main className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Visualisations</h1>
 
-      {/* Filtres — empilés sur mobile */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -123,6 +116,15 @@ export default function Visualisation() {
           <option value="">Toutes les catégories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        <select
+          value={visuSelectionnee?.id ?? ''}
+          onChange={e => setVisuSelectionnee(visuFiltrees.find(v => String(v.id) === e.target.value) ?? null)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white"
+          disabled={visuFiltrees.length === 0}
+        >
+          <option value="">— Choisir un visuel —</option>
+          {visuFiltrees.map(v => <option key={v.id} value={v.id}>{v.titre}</option>)}
+        </select>
       </div>
 
       {chargement ? (
@@ -133,49 +135,7 @@ export default function Visualisation() {
           <p className="text-gray-400 text-sm">Aucune visualisation disponible.</p>
         </div>
       ) : (
-        /* Sur mobile : colonne (liste puis viz). Sur desktop : côte à côte */
-        <div className="flex flex-col md:flex-row gap-4 items-start">
-
-          {/* Liste — pleine largeur sur mobile, 288px sur desktop */}
-          <div className="w-full md:w-72 md:flex-shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                {visuFiltrees.length} visualisation{visuFiltrees.length > 1 ? 's' : ''}
-              </p>
-            </div>
-            {/* Scroll horizontal sur mobile, vertical sur desktop */}
-            <ul
-              className="overflow-x-auto md:overflow-x-hidden overflow-y-hidden md:overflow-y-auto flex md:flex-col"
-              style={{ maxHeight: 'none' }}
-            >
-              {visuFiltrees.length === 0 ? (
-                <li className="px-4 py-8 text-center text-sm text-gray-400 w-full">Aucun résultat</li>
-              ) : (
-                visuFiltrees.map(v => (
-                  <li key={v.id} className="flex-shrink-0 md:flex-shrink w-48 md:w-auto">
-                    <button
-                      onClick={() => setVisuSelectionnee(v)}
-                      className={`w-full text-left px-4 py-3 border-b border-gray-50 transition-colors hover:bg-blue-50 ${
-                        visuSelectionnee?.id === v.id
-                          ? 'bg-blue-50 border-l-4 border-l-blue-500'
-                          : 'border-l-4 border-l-transparent'
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-gray-800 line-clamp-1">{v.titre}</p>
-                      {v.categorie && (
-                        <p className="text-xs text-blue-500 mt-0.5">{v.categorie}</p>
-                      )}
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-
-          {/* Panneau d'affichage */}
-          <PanneauAffichage visu={visuSelectionnee} />
-
-        </div>
+        <PanneauAffichage visu={visuSelectionnee} />
       )}
     </main>
   )
