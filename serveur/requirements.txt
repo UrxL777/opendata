@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pandas
+httpx
+supabase
+python-dotenv
+pydantic
+openpyxl
+python-multipart
+numpy
+chardet
+openai
+python-dateutil
