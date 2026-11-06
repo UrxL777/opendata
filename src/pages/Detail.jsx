@@ -255,6 +255,7 @@ export default function Detail() {
   const [estMobile, setEstMobile] = useState(window.innerWidth < 768)
   const [sheetOuverte, setSheetOuverte] = useState(false)
   const [sheetPleinEcran, setSheetPleinEcran] = useState(false)
+  const [décalageClavier, setDécalageClavier] = useState(0)
   const enRedimensionnement = useRef(false)
   const largeurDepart = useRef(0)
   const xDepart = useRef(0)
@@ -264,6 +265,22 @@ export default function Detail() {
     window.addEventListener('resize', gerer)
     return () => window.removeEventListener('resize', gerer)
   }, [])
+
+  useEffect(() => {
+    if (!estMobile) return
+    function mettreAJourClavier() {
+      if (window.visualViewport) {
+        const décalage = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop
+        setDécalageClavier(Math.max(0, décalage))
+      }
+    }
+    window.visualViewport?.addEventListener('resize', mettreAJourClavier)
+    window.visualViewport?.addEventListener('scroll', mettreAJourClavier)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', mettreAJourClavier)
+      window.visualViewport?.removeEventListener('scroll', mettreAJourClavier)
+    }
+  }, [estMobile])
 
   useEffect(() => {
     async function charger() {
@@ -414,8 +431,9 @@ export default function Detail() {
 
         {sheetOuverte && (
           <div
-            className="fixed bottom-0 left-0 right-0 bg-white z-50 flex flex-col transition-all duration-300"
+            className="fixed left-0 right-0 bg-white z-50 flex flex-col transition-all duration-300"
             style={{
+              bottom: décalageClavier,
               height: sheetPleinEcran ? '100%' : '72%',
               borderRadius: sheetPleinEcran ? '0' : '16px 16px 0 0',
             }}

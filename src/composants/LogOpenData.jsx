@@ -1,4 +1,4 @@
-export default function LogOpenData({ tailleIcone = 26, tailleTexte = '1.25rem', couleurTexte = '#111827', mode = 'clair' }) {
+export default function LogOpenData({ tailleIcone = 26, tailleTexte = '1.25rem', couleurTexte = '#111827', mode = 'clair', afficherTexte = true }) {
   const c = mode === 'sombre'
     ? { anneau: '#60A5FA', barre1: '#93C5FD', barre2: '#BFDBFE', barre3: '#93C5FD' }
     : { anneau: '#2563EB', barre1: '#BFDBFE', barre2: '#2563EB', barre3: '#60A5FA' }
@@ -11,9 +11,11 @@ export default function LogOpenData({ tailleIcone = 26, tailleTexte = '1.25rem',
         <rect x="14.25" y="12" width="3.5" height="12" rx="1" fill={c.barre2} />
         <rect x="19.5" y="14.5" width="3.5" height="9.5" rx="1" fill={c.barre3} />
       </svg>
-      <span style={{ fontWeight: 700, fontSize: tailleTexte, letterSpacing: '-0.02em', color: couleurTexte, lineHeight: 1 }}>
-        penData
-      </span>
+      {afficherTexte && (
+        <span style={{ fontWeight: 700, fontSize: tailleTexte, letterSpacing: '-0.02em', color: couleurTexte, lineHeight: 1 }}>
+          penData
+        </span>
+      )}
     </span>
   )
 }

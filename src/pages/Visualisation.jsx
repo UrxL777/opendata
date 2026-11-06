@@ -10,7 +10,7 @@ const CATEGORIES = [
 function PanneauAffichage({ visu }) {
   if (!visu) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-gray-200 min-h-[500px]">
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-gray-200 min-h-[300px] md:min-h-[500px]">
         <FileImage size={48} className="text-gray-200 mb-3" />
         <p className="text-gray-400 text-sm">Sélectionnez une visualisation</p>
       </div>
@@ -22,23 +22,23 @@ function PanneauAffichage({ visu }) {
   const estLien  = !!visu.lien_url
 
   return (
-    <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden min-h-[500px]">
+    <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden min-h-[300px] md:min-h-[500px]">
       {/* En-tête du panneau */}
       <div className="px-4 py-3 border-b border-gray-100">
-  <h2 className="font-semibold text-gray-800 text-base">{visu.titre}</h2>
-  {visu.categorie && (
-    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mt-1 inline-block">
-      {visu.categorie}
-    </span>
-  )}
-</div>
+        <h2 className="font-semibold text-gray-800 text-base">{visu.titre}</h2>
+        {visu.categorie && (
+          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mt-1 inline-block">
+            {visu.categorie}
+          </span>
+        )}
+      </div>
 
       {/* Zone graphique */}
       <div className="flex-1 overflow-hidden">
         {estEmbed ? (
           <div
             className="w-full h-full"
-            style={{ minHeight: '460px' }}
+            style={{ minHeight: '300px' }}
             dangerouslySetInnerHTML={{ __html: visu.code_embed }}
           />
         ) : estImage ? (
@@ -48,11 +48,11 @@ function PanneauAffichage({ visu }) {
             src={visu.lien_url}
             title={visu.titre}
             className="w-full h-full border-0"
-            style={{ minHeight: '460px' }}
+            style={{ minHeight: '300px' }}
             allowFullScreen
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-300">
+          <div className="flex items-center justify-center h-full text-gray-300 py-10">
             <p className="text-sm">Aucun contenu à afficher</p>
           </div>
         )}
@@ -69,10 +69,10 @@ function PanneauAffichage({ visu }) {
 }
 
 export default function Visualisation() {
-  const [visualisations, setVisualisations]   = useState([])
-  const [recherche, setRecherche]             = useState('')
+  const [visualisations, setVisualisations]     = useState([])
+  const [recherche, setRecherche]               = useState('')
   const [categorieFiltree, setCategorieFiltree] = useState('')
-  const [chargement, setChargement]           = useState(true)
+  const [chargement, setChargement]             = useState(true)
   const [visuSelectionnee, setVisuSelectionnee] = useState(null)
 
   async function charger() {
@@ -94,7 +94,6 @@ export default function Visualisation() {
     return motCorrespond && catCorrespond
   })
 
-  // Si la sélection actuelle n'est plus dans les résultats filtrés, on réinitialise
   useEffect(() => {
     if (visuSelectionnee && !visuFiltrees.find(v => v.id === visuSelectionnee.id)) {
       setVisuSelectionnee(visuFiltrees[0] ?? null)
@@ -105,8 +104,8 @@ export default function Visualisation() {
     <main className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Visualisations</h1>
 
-      {/* Filtres */}
-      <div className="flex gap-3 mb-6">
+      {/* Filtres — empilés sur mobile */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -134,21 +133,26 @@ export default function Visualisation() {
           <p className="text-gray-400 text-sm">Aucune visualisation disponible.</p>
         </div>
       ) : (
-        <div className="flex gap-4 items-start">
+        /* Sur mobile : colonne (liste puis viz). Sur desktop : côte à côte */
+        <div className="flex flex-col md:flex-row gap-4 items-start">
 
-          {/* Liste gauche */}
-          <div className="w-72 flex-shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {/* Liste — pleine largeur sur mobile, 288px sur desktop */}
+          <div className="w-full md:w-72 md:flex-shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 {visuFiltrees.length} visualisation{visuFiltrees.length > 1 ? 's' : ''}
               </p>
             </div>
-            <ul className="overflow-y-auto" style={{ maxHeight: '540px' }}>
+            {/* Scroll horizontal sur mobile, vertical sur desktop */}
+            <ul
+              className="overflow-x-auto md:overflow-x-hidden overflow-y-hidden md:overflow-y-auto flex md:flex-col"
+              style={{ maxHeight: 'none' }}
+            >
               {visuFiltrees.length === 0 ? (
-                <li className="px-4 py-8 text-center text-sm text-gray-400">Aucun résultat</li>
+                <li className="px-4 py-8 text-center text-sm text-gray-400 w-full">Aucun résultat</li>
               ) : (
                 visuFiltrees.map(v => (
-                  <li key={v.id}>
+                  <li key={v.id} className="flex-shrink-0 md:flex-shrink w-48 md:w-auto">
                     <button
                       onClick={() => setVisuSelectionnee(v)}
                       className={`w-full text-left px-4 py-3 border-b border-gray-50 transition-colors hover:bg-blue-50 ${
@@ -168,7 +172,7 @@ export default function Visualisation() {
             </ul>
           </div>
 
-          {/* Panneau d'affichage droit */}
+          {/* Panneau d'affichage */}
           <PanneauAffichage visu={visuSelectionnee} />
 
         </div>
