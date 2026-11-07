@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Download, ArrowLeft, TrendingUp, PanelLeftOpen, Send, MessageCircle, X, Maximize2, Minimize2 } from 'lucide-react'
+import { Download, ArrowLeft, PanelLeftOpen, Send, MessageCircle, X, Maximize2, Minimize2 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { IconeCategorie } from '../utilitaires/iconeCategorie'
 import ReactMarkdown from 'react-markdown'
@@ -98,7 +98,7 @@ function RapportNettoyage({ jeuId }) {
   )
 }
 
-function PanneauChat({ jeuId }) {
+function PanneauChat({ jeuId, estMobile }) {
   const cleStockage = `chat_${jeuId}`
 
   const [messages, setMessages] = useState(() => {
@@ -150,12 +150,13 @@ function PanneauChat({ jeuId }) {
   }
 
   function gererTouche(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !estMobile) {
       e.preventDefault()
       envoyerMessage()
     }
-  }
-
+  }  
+    
+  
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-gray-200 shrink-0">
@@ -163,7 +164,11 @@ function PanneauChat({ jeuId }) {
         <p className="text-xs text-gray-400">Questions sur ce dataset</p>
       </div>
 
-      <div ref={basMessages} className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0" style={{ overflowAnchor: 'none' }}>
+      <div
+        ref={basMessages}
+        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0"
+        style={{ overflowAnchor: 'none', overscrollBehaviorY: 'contain' }}
+      >
         {messages.map((msg, i) => (
           <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             {msg.role === 'user' ? (
@@ -255,7 +260,6 @@ export default function Detail() {
   const [estMobile, setEstMobile] = useState(window.innerWidth < 768)
   const [sheetOuverte, setSheetOuverte] = useState(false)
   const [sheetPleinEcran, setSheetPleinEcran] = useState(false)
-  const [décalageClavier, setDécalageClavier] = useState(0)
   const enRedimensionnement = useRef(false)
   const largeurDepart = useRef(0)
   const xDepart = useRef(0)
@@ -265,22 +269,6 @@ export default function Detail() {
     window.addEventListener('resize', gerer)
     return () => window.removeEventListener('resize', gerer)
   }, [])
-
-  useEffect(() => {
-    if (!estMobile) return
-    function mettreAJourClavier() {
-      if (window.visualViewport) {
-        const décalage = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop
-        setDécalageClavier(Math.max(0, décalage))
-      }
-    }
-    window.visualViewport?.addEventListener('resize', mettreAJourClavier)
-    window.visualViewport?.addEventListener('scroll', mettreAJourClavier)
-    return () => {
-      window.visualViewport?.removeEventListener('resize', mettreAJourClavier)
-      window.visualViewport?.removeEventListener('scroll', mettreAJourClavier)
-    }
-  }, [estMobile])
 
   useEffect(() => {
     async function charger() {
@@ -398,13 +386,6 @@ export default function Detail() {
           </div>
         ))}
       </div>
-
-      <Link
-        to={`/visualisation/${id}`}
-        className="flex items-center justify-center gap-2 border border-blue-600 text-blue-600 hover:bg-blue-50 py-3 rounded-lg font-medium"
-      >
-        <TrendingUp size={18} /> Visualiser ce jeu de données
-      </Link>
     </main>
   )
 
@@ -433,7 +414,7 @@ export default function Detail() {
           <div
             className="fixed left-0 right-0 bg-white z-50 flex flex-col transition-all duration-300"
             style={{
-              bottom: décalageClavier,
+              bottom: 0,
               height: sheetPleinEcran ? '100%' : '72%',
               borderRadius: sheetPleinEcran ? '0' : '16px 16px 0 0',
             }}
@@ -468,7 +449,7 @@ export default function Detail() {
               </button>
             </div>
             <div className="flex-1 min-h-0">
-              <PanneauChat jeuId={id} />
+              <PanneauChat jeuId={id} estMobile={true} />
             </div>
           </div>
         )}
@@ -501,7 +482,7 @@ export default function Detail() {
             </button>
           </div>
           <div className="flex-1 min-h-0">
-            <PanneauChat jeuId={id} />
+            <PanneauChat jeuId={id} estMobile={false} />
           </div>
         </div>
       )}

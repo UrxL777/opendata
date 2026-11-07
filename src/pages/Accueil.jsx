@@ -4,7 +4,7 @@ import { Search, Users, Database, Download } from 'lucide-react'
 import { supabase } from '../supabase'
 import { IconeCategorie } from '../utilitaires/iconeCategorie'
 
-const MAX_CATEGORIES_ACCUEIL = 8
+const CATEGORIES_ACCUEIL = ['Économie', 'Santé', 'Éducation', 'Agriculture', 'Transport', 'Environnement', 'Démographie', 'Sport']
 
 export default function Accueil() {
   const [stats, setStats] = useState({ jeux: 0, utilisateurs: 0, telechargements: 0 })
@@ -41,7 +41,10 @@ export default function Accueil() {
         if (j.categorie_id) compteParCategorie[j.categorie_id] = (compteParCategorie[j.categorie_id] ?? 0) + 1
       })
 
-      const catsAvecCompte = (cats ?? []).map(c => ({ ...c, nb_jeux: compteParCategorie[c.id] ?? 0 }))
+      const catsAvecCompte = (cats ?? [])
+        .map(c => ({ ...c, nb_jeux: compteParCategorie[c.id] ?? 0 }))
+        .filter(c => CATEGORIES_ACCUEIL.includes(c.nom))
+        .sort((a,b) => CATEGORIES_ACCUEIL.indexOf(a.nom) - CATEGORIES_ACCUEIL.indexOf(b.nom))
 
       setStats({ jeux: jeux ?? 0, utilisateurs: utilisateurs ?? 0, telechargements })
       setCategories(catsAvecCompte)
@@ -49,8 +52,8 @@ export default function Accueil() {
     charger()
   }, [])
 
-  const categoriesAffichees = categories.slice(0, MAX_CATEGORIES_ACCUEIL)
-  const plusDeCategories = categories.length > MAX_CATEGORIES_ACCUEIL
+  const categoriesAffichees = categories
+  const plusDeCategories = false
 
   return (
     <div>

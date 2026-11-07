@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
@@ -47,6 +47,38 @@ function IcôneOeil({ visible }) {
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
       <circle cx="12" cy="12" r="3"/>
     </svg>
+  )
+}
+
+function BoutonUtilisateurConnecte({ utilisateur, onDeconnecter }) {
+  const [pseudo, setPseudo] = useState('')
+
+  useEffect(() => {
+    async function chargerPseudo() {
+      const { data } = await supabase
+        .from('profiles')
+        .select('pseudo')
+        .eq('id', utilisateur.id)
+        .maybeSingle()
+      if (data?.pseudo) setPseudo(data.pseudo)
+    }
+    chargerPseudo()
+  }, [utilisateur.id])
+
+  return (
+    <div className="flex items-center gap-2">
+      {pseudo && (
+        <span className="text-sm text-gray-700 font-medium hidden sm:inline">
+          {pseudo}
+        </span>
+      )}
+      <button
+        onClick={onDeconnecter}
+        className="flex items-center gap-1 text-sm text-gray-600 hover:text-red-600 border border-gray-200 px-3 py-2 rounded-lg"
+      >
+        <IcôneDeconnexion /> Déconnexion
+      </button>
+    </div>
   )
 }
 
@@ -130,14 +162,7 @@ export default function BoutonConnexion() {
   }
 
   if (utilisateur) {
-    return (
-      <button
-        onClick={deconnecter}
-        className="flex items-center gap-1 text-sm text-gray-600 hover:text-red-600 border border-gray-200 px-3 py-2 rounded-lg"
-      >
-        <IcôneDeconnexion /> Déconnexion
-      </button>
-    )
+    return <BoutonUtilisateurConnecte utilisateur={utilisateur} onDeconnecter={deconnecter} />
   }
 
   return (
@@ -169,7 +194,6 @@ export default function BoutonConnexion() {
               </button>
             </div>
 
-            {/* ── Vue connexion ── */}
             {vue === 'connexion' && (
               <form onSubmit={connecter} className="space-y-4">
                 <div>
@@ -231,7 +255,6 @@ export default function BoutonConnexion() {
               </form>
             )}
 
-            {/* ── Vue inscription ── */}
             {vue === 'inscription' && (
               inscriptionReussie ? (
                 <div className="text-center py-4">
@@ -307,7 +330,6 @@ export default function BoutonConnexion() {
               )
             )}
 
-            {/* ── Vue mot de passe oublié ── */}
             {vue === 'mot_de_passe_oublie' && (
               reinitReussie ? (
                 <div className="text-center py-4">
