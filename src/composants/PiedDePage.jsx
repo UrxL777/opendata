@@ -56,7 +56,7 @@ export default function PiedDePage() {
           <ul className="space-y-2 text-sm">
             <li><Link to="/" className="hover:text-white">Accueil</Link></li>
             <li><Link to="/donnees" className="hover:text-white">Données</Link></li>
-            <li><Link to="/visualisation" className="hover:text-white">Visualisation</Link></li>
+            <li><Link to="/visualisation" className="hover:text-white">Dashboards</Link></li>
           </ul>
         </div>
 
