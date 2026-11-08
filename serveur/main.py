@@ -251,8 +251,13 @@ async def verifier_doublon(
             # 2. Nouvelle version d'un de ses jeux ?
             resultat = "nouveau"
             try:
-                jeu_trouve, pct_lignes = _chercher_nouvelle_version(chemin_tmp, fichier.filename, utilisateur_id, champs_jeu)
-                if jeu_trouve:
+                jeu_trouve, pct_lignes, identique = _chercher_nouvelle_version(chemin_tmp, fichier.filename, utilisateur_id, champs_jeu)
+                if jeu_trouve and identique:
+                    # Même contenu, même si l'empreinte enregistrée a été calculée autrement
+                    formats = [f["format"] for f in (jeu_trouve.get("fichiers") or [])]
+                    resultat = "identique_meme_format" if extension in formats else "identique_autre_format"
+                    pct_lignes = None
+                elif jeu_trouve:
                     resultat = "nouvelle_version"
             except Exception:
                 print(f"[DOUBLON] ✗ Comparaison impossible : {traceback.format_exc()}")
@@ -306,7 +311,7 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
     """
     Cherche parmi les jeux de l'utilisateur celui dont ce fichier est une nouvelle version :
     mêmes colonnes et au moins 70 % des anciennes lignes retrouvées.
-    Retourne (jeu, pourcentage de lignes) ou (None, None).
+    Retourne (jeu, pourcentage de lignes, contenu identique ?) ou (None, None, False).
     """
     df_nouveau = lire_fichier(chemin_tmp, nom_fichier)
 
@@ -315,7 +320,7 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
         .eq("utilisateur_id", utilisateur_id) \
         .execute().data or []
     if not jeux:
-        return None, None
+        return None, None, False
 
     # Colonnes de chaque jeu, lues dans les rapports d'analyse (sans ouvrir les fichiers)
     analyses = supabase.table("analyses") \
@@ -328,7 +333,7 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
         for a in analyses
     }
 
-    meilleur_jeu, meilleur_pct = None, None
+    meilleur_jeu, meilleur_pct, identique = None, None, False
     for jeu in jeux:
         colonnes = colonnes_par_jeu.get(str(jeu["id"]))
         fichiers = jeu.get("fichiers") or []
@@ -341,10 +346,12 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
             continue
         comparaison = comparer(df_ancien, df_nouveau)
         print(f"[DOUBLON] Jeu {jeu['id']} : {comparaison}")
+        if comparaison["identique"]:
+            return jeu, comparaison["pct_lignes"], True
         if comparaison["nouvelle_version"] and (meilleur_pct is None or comparaison["pct_lignes"] > meilleur_pct):
             meilleur_jeu, meilleur_pct = jeu, comparaison["pct_lignes"]
 
-    return meilleur_jeu, meilleur_pct
+    return meilleur_jeu, meilleur_pct, False
 
 
 @app.post("/suggerer")

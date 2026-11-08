@@ -25,6 +25,8 @@ function IcôneOeil({ visible }) {
 // ─── Formulaire jeu de données ────────────────────────────────────────────────
 
 const NOMS_FORMATS = { csv: 'CSV', xlsx: 'Excel', xls: 'Excel', json: 'JSON' }
+const FORMATS_ACCEPTES = ['csv', 'xlsx', 'xls', 'json']
+const TAILLE_MAX_MO = 50
 
 function FormulaireDataset({ onFermer }) {
   const { utilisateur } = useAuthentification()
@@ -46,6 +48,7 @@ function FormulaireDataset({ onFermer }) {
   const [comparaison, setComparaison] = useState(null)
   const [choix, setChoix] = useState(null)
   const [erreur, setErreur] = useState('')
+  const [erreurFichier, setErreurFichier] = useState('')
   const [avertissementGlobal, setAvertissementGlobal] = useState('')
 
   useEffect(() => {
@@ -58,6 +61,7 @@ function FormulaireDataset({ onFermer }) {
     setSource('')
     setCategorieId('')
     setErreur('')
+    setErreurFichier('')
     setAvertissementGlobal('')
     setComparaison(null)
     setChoix(null)
@@ -77,6 +81,21 @@ function FormulaireDataset({ onFermer }) {
     if (!f) return
     if (controleurRef.current) controleurRef.current.abort()
     viderFormulaire()
+
+    // Format et taille vérifiés avant tout envoi au serveur
+    const ext = f.name.split('.').pop().toLowerCase()
+    if (!FORMATS_ACCEPTES.includes(ext)) {
+      setFichier(null)
+      setErreurFichier(`Format non accepté (.${ext}). Formats acceptés : CSV, Excel (.xlsx, .xls) et JSON.`)
+      return
+    }
+    const tailleMo = f.size / (1024 * 1024)
+    if (tailleMo > TAILLE_MAX_MO) {
+      setFichier(null)
+      setErreurFichier(`Fichier trop volumineux (${Math.round(tailleMo)} Mo). La taille maximale est de ${TAILLE_MAX_MO} Mo.`)
+      return
+    }
+
     setFichier(f)
     setAnalyse(true)
     setVerification(true)
@@ -154,6 +173,9 @@ function FormulaireDataset({ onFermer }) {
     e.preventDefault()
     if (!fichier) { setErreur('Veuillez sélectionner un fichier.'); return }
     if (!peutPublier) return
+    if (!titre.trim()) { setErreur('Le titre est obligatoire.'); return }
+    if (!description.trim()) { setErreur('La description est obligatoire.'); return }
+    if (!categorieId) { setErreur('La catégorie est obligatoire.'); return }
     setErreur('')
     setChargement(true)
     try {
@@ -227,6 +249,17 @@ function FormulaireDataset({ onFermer }) {
         )}
       </div>
 
+      <p className="text-xs text-gray-400 text-center -mt-2">
+        Formats acceptés : CSV, Excel (.xlsx, .xls), JSON · Taille maximale : {TAILLE_MAX_MO} Mo
+      </p>
+
+      {erreurFichier && (
+        <div className="flex gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+          <XCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+          <p className="text-xs text-red-800">{erreurFichier}</p>
+        </div>
+      )}
+
       {!fichier && (
         <p className="text-xs text-gray-500 text-center">
           💡 Vous avez modifié un fichier déjà publié ? Déposez simplement la nouvelle version : nous la reconnaîtrons automatiquement.
@@ -295,8 +328,8 @@ function FormulaireDataset({ onFermer }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Description</label>
-        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
+        <label className="block text-sm font-medium mb-1">Description *</label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} required
           className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
       </div>
 
@@ -307,8 +340,8 @@ function FormulaireDataset({ onFermer }) {
             className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Catégorie</label>
-          <select value={categorieId} onChange={e => setCategorieId(e.target.value)}
+          <label className="block text-sm font-medium mb-1">Catégorie *</label>
+          <select value={categorieId} onChange={e => setCategorieId(e.target.value)} required
             className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
             <option value="">-- Choisir --</option>
             {categories.map(c => <option key={c.id} value={String(c.id)}>{c.nom}</option>)}
