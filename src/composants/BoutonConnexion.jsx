@@ -68,7 +68,7 @@ function BoutonUtilisateurConnecte({ utilisateur, onDeconnecter }) {
   return (
     <div className="flex items-center gap-2">
       {pseudo && (
-        <span className="text-sm text-gray-700 font-medium hidden sm:inline">
+        <span className="text-sm text-gray-700 font-medium">
           {pseudo}
         </span>
       )}

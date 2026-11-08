@@ -98,7 +98,7 @@ function RapportNettoyage({ jeuId }) {
   )
 }
 
-function PanneauChat({ jeuId, estMobile }) {
+function PanneauChat({ jeuId, estMobile, afficherHeader = true }) {
   const cleStockage = `chat_${jeuId}`
 
   const [messages, setMessages] = useState(() => {
@@ -154,15 +154,16 @@ function PanneauChat({ jeuId, estMobile }) {
       e.preventDefault()
       envoyerMessage()
     }
-  }  
-    
-  
+  }
+
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-gray-200 shrink-0">
-        <p className="font-semibold text-gray-800 text-sm">Analyste IA</p>
-        <p className="text-xs text-gray-400">Questions sur ce dataset</p>
-      </div>
+      {afficherHeader && (
+        <div className="p-3 border-b border-gray-200 shrink-0">
+          <p className="font-semibold text-gray-800 text-sm">Analyste IA</p>
+          <p className="text-xs text-gray-400">Questions sur ce dataset</p>
+        </div>
+      )}
 
       <div
         ref={basMessages}
@@ -228,7 +229,7 @@ function PanneauChat({ jeuId, estMobile }) {
             placeholder="Posez une question..."
             rows={1}
             className="flex-1 resize-none border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-            style={{ maxHeight: '96px', overflowY: 'auto' }}
+            style={{ maxHeight: '96px', overflowY: 'auto', fontSize: '16px' }}
             onInput={e => {
               e.target.style.height = '36px'
               e.target.style.height = Math.min(e.target.scrollHeight, 96) + 'px'
@@ -449,7 +450,7 @@ export default function Detail() {
               </button>
             </div>
             <div className="flex-1 min-h-0">
-              <PanneauChat jeuId={id} estMobile={true} />
+              <PanneauChat jeuId={id} estMobile={true} afficherHeader={false} />
             </div>
           </div>
         )}
