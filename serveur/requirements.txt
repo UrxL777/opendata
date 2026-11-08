@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-pandas
+pandas>=2.2,<3
 httpx
 supabase
 python-dotenv

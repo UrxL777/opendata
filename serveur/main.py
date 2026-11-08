@@ -29,27 +29,30 @@ async def _tache_reanalyse():
     while True:
         try:
             print("[REANALYSE] Vérification des fichiers non analysés...")
-            res_fichiers = supabase.table("fichiers").select("id, nom_fichier, chemin_stockage").execute()
-            tous_fichiers = res_fichiers.data or []
+            # Le rapport d'analyse est rangé sous le numéro du JEU de données (comme le fait le site),
+            # jamais sous le numéro d'un fichier : sinon il pourrait écraser le rapport d'un autre jeu.
+            res_jeux = supabase.table("jeux_de_donnees").select("id, fichiers(id, nom_fichier, chemin_stockage)").execute()
+            tous_jeux = res_jeux.data or []
 
             res_analyses = supabase.table("analyses").select("fichier_id").eq("statut", "termine").execute()
             ids_termines = {row["fichier_id"] for row in (res_analyses.data or [])}
 
-            a_reanalyser = [f for f in tous_fichiers if f["id"] not in ids_termines]
-            print(f"[REANALYSE] {len(a_reanalyser)} fichier(s) à traiter")
+            a_reanalyser = [j for j in tous_jeux if j["id"] not in ids_termines and j.get("fichiers")]
+            print(f"[REANALYSE] {len(a_reanalyser)} jeu(x) à traiter")
 
-            for fichier in a_reanalyser:
+            for jeu in a_reanalyser:
+                fichier = jeu["fichiers"][0]
                 try:
                     contenu = supabase.storage.from_("jeux-donnees").download(fichier["chemin_stockage"])
                     async with httpx.AsyncClient(timeout=120) as client:
                         await client.post(
                             f"{os.getenv('API_URL', 'http://localhost:8000')}/analyser",
-                            params={"fichier_id": fichier["id"]},
+                            params={"fichier_id": jeu["id"]},
                             files={"fichier": (fichier["nom_fichier"], contenu)},
                         )
-                    print(f"[REANALYSE] ✓ {fichier['nom_fichier']}")
+                    print(f"[REANALYSE] ✓ jeu {jeu['id']} ({fichier['nom_fichier']})")
                 except Exception as e:
-                    print(f"[REANALYSE] ✗ {fichier['nom_fichier']} : {e}")
+                    print(f"[REANALYSE] ✗ jeu {jeu['id']} ({fichier['nom_fichier']}) : {e}")
 
         except Exception as e:
             print(f"[REANALYSE] Erreur générale : {e}")

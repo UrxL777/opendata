@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { traduireErreurAuth } from '../utilitaires/erreursAuth'
 
 function IcôneOeil({ visible }) {
   if (visible) {
@@ -46,7 +47,7 @@ export default function ReinitalisationMdp() {
     setChargement(true)
     const { error } = await supabase.auth.updateUser({ password: mdp })
     setChargement(false)
-    if (error) { setErreur(error.message); return }
+    if (error) { setErreur(traduireErreurAuth(error.message)); return }
     setSucces(true)
     setTimeout(() => navigate('/'), 2000)
   }

@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 import chardet
 import os
@@ -43,11 +44,12 @@ def detecter_role(serie: pd.Series, nom_colonne: str) -> str:
     Estime le rôle sémantique d'une colonne selon son contenu.
     Retourne : 'quantitative', 'categorielle', 'date', 'texte_libre', 'identifiant'
     """
-    nom = nom_colonne.lower()
-
-    # Mots-clés qui suggèrent un identifiant
-    mots_identifiant = ["id", "code", "matricule", "numero", "num", "ref", "telephone", "tel", "postal"]
-    if any(mot in nom for mot in mots_identifiant):
+    # Mots-clés qui suggèrent un identifiant, comparés à des mots ENTIERS du nom
+    # ("Humidity" contient "id" mais n'est pas un identifiant)
+    nom = re.sub(r"([a-z])([A-Z])", r"\1 \2", str(nom_colonne)).lower()
+    mots_du_nom = set(re.split(r"[^a-z0-9]+", nom))
+    mots_identifiant = {"id", "code", "matricule", "numero", "num", "ref", "telephone", "tel", "postal", "cp", "uuid", "siret", "siren"}
+    if mots_du_nom & mots_identifiant:
         return "identifiant"
 
     # Tenter une conversion en date (sans infer_datetime_format, supprimé en pandas 2.2)
@@ -62,7 +64,9 @@ def detecter_role(serie: pd.Series, nom_colonne: str) -> str:
     if pd.api.types.is_numeric_dtype(serie):
         nb_uniques = serie.nunique()
         nb_lignes = serie.count()
-        if nb_uniques == nb_lignes and nb_lignes > 10:
+        # Des nombres entiers tous différents ressemblent à un identifiant ;
+        # des mesures à virgule (température, prix...) sont presque toujours toutes différentes
+        if nb_uniques == nb_lignes and nb_lignes > 10 and pd.api.types.is_integer_dtype(serie):
             return "identifiant"
         if nb_uniques <= 20:
             return "categorielle"
