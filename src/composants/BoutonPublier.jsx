@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Database, BarChart2, Link, Code, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
+import { traduireErreurAuth } from '../utilitaires/erreursAuth'
 import { useNavigate } from 'react-router-dom'
 
 function IcôneOeil({ visible }) {
@@ -494,6 +495,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
   const [erreurCo, setErreurCo] = useState('')
   const [chargementCo, setChargementCo] = useState(false)
   const [inscriptionReussie, setInscriptionReussie] = useState(false)
+  const [reinitReussie, setReinitReussie] = useState(false)
   const [mdpVisible, setMdpVisible] = useState(false)
 
   function ouvrir() {
@@ -524,6 +526,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
     setPseudoCo('')
     setErreurCo('')
     setMdpVisible(false)
+    setReinitReussie(false)
   }
 
   async function connecterDepuisPublier(e) {
@@ -532,8 +535,20 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
     setChargementCo(true)
     const { error } = await supabase.auth.signInWithPassword({ email: emailCo, password: mdpCo })
     setChargementCo(false)
-    if (error) { setErreurCo(error.message); return }
+    if (error) { setErreurCo(traduireErreurAuth(error.message)); return }
     setEtape('choix')
+  }
+
+  async function reinitialiserDepuisPublier(e) {
+    e.preventDefault()
+    setErreurCo('')
+    setChargementCo(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(emailCo, {
+      redirectTo: `${window.location.origin}/reinitialisation-mdp`,
+    })
+    setChargementCo(false)
+    if (error) { setErreurCo(traduireErreurAuth(error.message)); return }
+    setReinitReussie(true)
   }
 
   async function inscrireDepuisPublier(e) {
@@ -541,7 +556,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
     setErreurCo('')
     setChargementCo(true)
     const { data, error } = await supabase.auth.signUp({ email: emailCo, password: mdpCo })
-    if (error) { setChargementCo(false); setErreurCo(error.message); return }
+    if (error) { setChargementCo(false); setErreurCo(traduireErreurAuth(error.message)); return }
     // Enregistrer le pseudo dans profiles
     if (data?.user) {
       await supabase.from('profiles').upsert({ id: data.user.id, pseudo: pseudoCo })
@@ -589,7 +604,11 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Mot de passe</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-sm font-medium">Mot de passe</label>
+                        <button type="button" onClick={() => changerVueCo('mot_de_passe_oublie')}
+                          className="text-xs text-blue-600 hover:underline">Mot de passe oublié ?</button>
+                      </div>
                       <div className="relative">
                         <input type={mdpVisible ? 'text' : 'password'} value={mdpCo} onChange={e => setMdpCo(e.target.value)} required
                           className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500" />
@@ -610,6 +629,39 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                         className="text-blue-600 font-medium hover:underline">S'inscrire</button>
                     </p>
                   </form>
+                )}
+
+                {vueConnexion === 'mot_de_passe_oublie' && (
+                  reinitReussie ? (
+                    <div className="text-center py-4">
+                      <p className="font-semibold text-gray-800 mb-2">Email envoyé</p>
+                      <p className="text-gray-500 text-sm">
+                        Un lien de réinitialisation a été envoyé à <strong>{emailCo}</strong>. Vérifiez votre boîte de réception.
+                      </p>
+                      <button type="button" onClick={() => changerVueCo('connexion')} className="mt-4 text-sm text-blue-600 hover:underline">
+                        Retour à la connexion
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={reinitialiserDepuisPublier} className="space-y-4">
+                      <p className="text-sm text-gray-500">Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.</p>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Email</label>
+                        <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required
+                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
+                      </div>
+                      {erreurCo && <p className="text-red-600 text-sm">{erreurCo}</p>}
+                      <button type="submit" disabled={chargementCo}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium">
+                        {chargementCo ? 'Envoi...' : 'Envoyer le lien'}
+                      </button>
+                      <p className="text-center text-sm text-gray-500">
+                        <button type="button" onClick={() => changerVueCo('connexion')} className="text-blue-600 font-medium hover:underline">
+                          Retour à la connexion
+                        </button>
+                      </p>
+                    </form>
+                  )
                 )}
 
                 {vueConnexion === 'inscription' && (

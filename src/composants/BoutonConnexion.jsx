@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
+import { traduireErreurAuth } from '../utilitaires/erreursAuth'
 
 function IcôneDeconnexion() {
   return (
@@ -132,7 +133,7 @@ export default function BoutonConnexion() {
     setChargement(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password: mdp })
     setChargement(false)
-    if (error) { setErreur(error.message); return }
+    if (error) { setErreur(traduireErreurAuth(error.message)); return }
     fermer()
   }
 
@@ -141,7 +142,7 @@ export default function BoutonConnexion() {
     setErreur('')
     setChargement(true)
     const { data, error } = await supabase.auth.signUp({ email, password: mdp })
-    if (error) { setChargement(false); setErreur(error.message); return }
+    if (error) { setChargement(false); setErreur(traduireErreurAuth(error.message)); return }
     if (data?.user) {
       await supabase.from('profiles').upsert({ id: data.user.id, pseudo })
     }
@@ -157,7 +158,7 @@ export default function BoutonConnexion() {
       redirectTo: `${window.location.origin}/reinitialisation-mdp`,
     })
     setChargement(false)
-    if (error) { setErreur(error.message); return }
+    if (error) { setErreur(traduireErreurAuth(error.message)); return }
     setReinitReussie(true)
   }
 

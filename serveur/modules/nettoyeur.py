@@ -47,7 +47,7 @@ def convertir_dates(df: pd.DataFrame, colonnes_inspection: list) -> tuple[pd.Dat
     cols_dates = [c["nom"] for c in colonnes_inspection if c["role_estime"] == "date" and c["nom"] in df.columns]
     for col in cols_dates:
         try:
-            df[col] = pd.to_datetime(df[col], infer_datetime_format=True, errors="coerce")
+            df[col] = pd.to_datetime(df[col], errors="coerce")
             operations.append(f"Colonne '{col}' convertie en date.")
         except Exception:
             operations.append(f"Colonne '{col}' : conversion en date échouée, conservée telle quelle.")

@@ -64,13 +64,13 @@ export default function PiedDePage() {
         <div>
           <h3 className="text-white font-semibold mb-3">Catégories</h3>
           <ul className="space-y-2 text-sm">
-            <li><Link to="/donnees?categorie=Économie" className="hover:text-white">Économie</Link></li>
-            <li><Link to="/donnees?categorie=Environnement" className="hover:text-white">Environnement</Link></li>
-            <li><Link to="/donnees?categorie=Santé" className="hover:text-white">Santé</Link></li>
-            <li><Link to="/donnees?categorie=Éducation" className="hover:text-white">Éducation</Link></li>
-            <li><Link to="/donnees?categorie=Démographie" className="hover:text-white">Démographie</Link></li>
-            <li><Link to="/donnees?categorie=Sport" className="hover:text-white">Sport</Link></li>
-            <li><Link to="/donnees?categorie=Sécurité & Justice" className="hover:text-white">Sécurité & Justice</Link></li>
+            <li><Link to="/donnees?categorie=1" className="hover:text-white">Économie</Link></li>
+            <li><Link to="/donnees?categorie=6" className="hover:text-white">Environnement</Link></li>
+            <li><Link to="/donnees?categorie=2" className="hover:text-white">Santé</Link></li>
+            <li><Link to="/donnees?categorie=3" className="hover:text-white">Éducation</Link></li>
+            <li><Link to="/donnees?categorie=7" className="hover:text-white">Démographie</Link></li>
+            <li><Link to="/donnees?categorie=8" className="hover:text-white">Sport</Link></li>
+            <li><Link to="/donnees?categorie=10" className="hover:text-white">Sécurité & Justice</Link></li>
           </ul>
         </div>
 
