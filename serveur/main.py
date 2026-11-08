@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from modules.inspecteur import inspecter, lire_fichier
 from modules.nettoyeur import nettoyer
 from modules.rapport import generer_rapport
+from modules.comparateur import comparer, memes_colonnes
 from agent import suggerer as agent_suggerer, chat as agent_chat
 
 load_dotenv()
@@ -231,15 +232,33 @@ async def verifier_doublon(
         extension = suffixe.lower().strip(".")
         hash_fichier = hash_contenu_dataframe(chemin_tmp, extension) or calculer_hash(chemin_tmp, extension)
 
+        champs_jeu = "id, titre, description, source, categorie_id, fichiers(format, chemin_stockage)"
+
+        # 1. Même contenu déjà publié par cet utilisateur ?
         res_perso = supabase.table("jeux_de_donnees") \
-            .select("id") \
+            .select(champs_jeu) \
             .eq("utilisateur_id", utilisateur_id) \
             .eq("hash_fichier", hash_fichier) \
             .execute()
 
-        doublon_perso = bool(res_perso.data)
-        jeu_id_existant = str(res_perso.data[0]["id"]) if doublon_perso else None
+        jeu_trouve = res_perso.data[0] if res_perso.data else None
+        pct_lignes = None
 
+        if jeu_trouve:
+            formats = [f["format"] for f in (jeu_trouve.get("fichiers") or [])]
+            resultat = "identique_meme_format" if extension in formats else "identique_autre_format"
+        else:
+            # 2. Nouvelle version d'un de ses jeux ?
+            resultat = "nouveau"
+            try:
+                jeu_trouve, pct_lignes = _chercher_nouvelle_version(chemin_tmp, fichier.filename, utilisateur_id, champs_jeu)
+                if jeu_trouve:
+                    resultat = "nouvelle_version"
+            except Exception:
+                print(f"[DOUBLON] ✗ Comparaison impossible : {traceback.format_exc()}")
+                jeu_trouve = None
+
+        # 3. Même contenu publié par un autre utilisateur ?
         res_global = supabase.table("jeux_de_donnees") \
             .select("id") \
             .neq("utilisateur_id", utilisateur_id) \
@@ -247,18 +266,85 @@ async def verifier_doublon(
             .execute()
 
         doublon_global = bool(res_global.data)
-        print(f"[DOUBLON] doublon_perso={doublon_perso} | doublon_global={doublon_global}")
+        doublon_perso = resultat.startswith("identique")
+        print(f"[DOUBLON] resultat={resultat} | pct_lignes={pct_lignes} | doublon_global={doublon_global}")
+
+        jeu = None
+        if jeu_trouve:
+            jeu = {k: jeu_trouve.get(k) for k in ("id", "titre", "description", "source", "categorie_id")}
 
         return {
-            "doublon": doublon_perso,
-            "jeu_id": jeu_id_existant,
+            "resultat": resultat,
+            "jeu": jeu,
+            "pct_lignes": pct_lignes,
             "hash_fichier": hash_fichier,
             "doublon_global": doublon_global,
             "format_doublon": extension if doublon_global else None,
+            # Anciens champs, gardés pour la compatibilité avec l'ancien formulaire
+            "doublon": doublon_perso,
+            "jeu_id": str(jeu_trouve["id"]) if doublon_perso else None,
         }
 
     finally:
         os.unlink(chemin_tmp)
+
+
+def _lire_fichier_stocke(chemin_stockage: str) -> pd.DataFrame:
+    """Télécharge un fichier depuis Supabase Storage et le lit avec pandas."""
+    suffixe = os.path.splitext(chemin_stockage)[1]
+    contenu = supabase.storage.from_("jeux-donnees").download(chemin_stockage)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffixe) as tmp:
+        tmp.write(contenu)
+        chemin_tmp = tmp.name
+    try:
+        return lire_fichier(chemin_tmp, chemin_stockage)
+    finally:
+        os.unlink(chemin_tmp)
+
+
+def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id: str, champs_jeu: str):
+    """
+    Cherche parmi les jeux de l'utilisateur celui dont ce fichier est une nouvelle version :
+    mêmes colonnes et au moins 70 % des anciennes lignes retrouvées.
+    Retourne (jeu, pourcentage de lignes) ou (None, None).
+    """
+    df_nouveau = lire_fichier(chemin_tmp, nom_fichier)
+
+    jeux = supabase.table("jeux_de_donnees") \
+        .select(champs_jeu) \
+        .eq("utilisateur_id", utilisateur_id) \
+        .execute().data or []
+    if not jeux:
+        return None, None
+
+    # Colonnes de chaque jeu, lues dans les rapports d'analyse (sans ouvrir les fichiers)
+    analyses = supabase.table("analyses") \
+        .select("fichier_id, colonnes:resultats->inspection->colonnes") \
+        .in_("fichier_id", [j["id"] for j in jeux]) \
+        .eq("statut", "termine") \
+        .execute().data or []
+    colonnes_par_jeu = {
+        str(a["fichier_id"]): [c["nom"] for c in (a.get("colonnes") or [])]
+        for a in analyses
+    }
+
+    meilleur_jeu, meilleur_pct = None, None
+    for jeu in jeux:
+        colonnes = colonnes_par_jeu.get(str(jeu["id"]))
+        fichiers = jeu.get("fichiers") or []
+        if not colonnes or not fichiers or not memes_colonnes(colonnes, df_nouveau.columns):
+            continue
+        try:
+            df_ancien = _lire_fichier_stocke(fichiers[0]["chemin_stockage"])
+        except Exception as e:
+            print(f"[DOUBLON] Ancien fichier illisible (jeu {jeu['id']}) : {e}")
+            continue
+        comparaison = comparer(df_ancien, df_nouveau)
+        print(f"[DOUBLON] Jeu {jeu['id']} : {comparaison}")
+        if comparaison["nouvelle_version"] and (meilleur_pct is None or comparaison["pct_lignes"] > meilleur_pct):
+            meilleur_jeu, meilleur_pct = jeu, comparaison["pct_lignes"]
+
+    return meilleur_jeu, meilleur_pct
 
 
 @app.post("/suggerer")
