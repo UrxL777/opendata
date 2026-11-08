@@ -99,7 +99,7 @@ export default function Donnees() {
     <div>
       <main className="max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-3xl font-extrabold text-gray-900 mb-1">Catalogue de données</h1>
-        <p className="text-gray-500 mb-8">Explorez et téléchargez des jeux de données en formats ouverts et réutilisables.</p>
+        <p className="text-gray-500 mb-8">Explorez et téléchargez gratuitement des jeux de données aux formats CSV, Excel et JSON, sans créer de compte.</p>
 
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-2 bg-white mb-4">
           <Search size={18} className="text-gray-400" />

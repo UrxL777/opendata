@@ -58,12 +58,12 @@ export default function Accueil() {
   return (
     <div>
       <section className="bg-gradient-to-b from-blue-50 to-white py-20 px-4 text-center">
-        <p className="text-blue-600 font-medium mb-3">Des données gratuite sous tous les formats, partagées par tous</p>
+        <p className="text-blue-600 font-medium mb-3">Des données ouvertes et gratuites, partagées par tous</p>
         <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
           Vous cherchez un jeu de données ?<br />Trouvez-le, ou partagez le vôtre.
         </h1>
         <p className="text-gray-500 mb-8 max-w-xl mx-auto">
-          Déposez, explorez et téléchargez gratuitement des jeux de données disponibles sous n'importe quel formats.
+          Déposez, explorez et téléchargez gratuitement des jeux de données aux formats CSV, Excel et JSON.
         </p>
         <div className="flex justify-center">
           <Link to="/donnees" className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium">
@@ -89,7 +89,7 @@ export default function Accueil() {
           <div className="border border-gray-100 rounded-2xl p-6 shadow-sm">
             <div className="flex justify-center mb-2 text-blue-600"><Users size={28} /></div>
             <p className="text-3xl font-bold text-blue-600">{stats.utilisateurs}</p>
-            <p className="text-gray-500 text-sm mt-1">Utilisateurs actifs</p>
+            <p className="text-gray-500 text-sm mt-1">Utilisateurs inscrits</p>
           </div>
         </div>
       </section>
