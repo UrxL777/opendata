@@ -531,8 +531,8 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                     <BarChart2 size={22} className="text-purple-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Visualisation</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Partager un graphique ou un dashboard</p>
+                    <p className="font-semibold text-sm">Dashboard</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Partager un dashboard interactif (Power BI, Tableau, Looker Studio…)</p>
                   </div>
                 </button>
               </div>
