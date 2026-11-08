@@ -170,7 +170,7 @@ export default function Donnees() {
                     {fichiers.length > 0 && (
                       <div className="grid grid-cols-3 text-xs text-gray-500 gap-2">
                         <div><p className="font-medium text-gray-700">Taille</p><p>{formaterTaille(tailleTotale)}</p></div>
-                        <div><p className="font-medium text-gray-700">Mis à jour</p><p>{new Date(jeu.cree_le).toLocaleDateString('fr-FR')}</p></div>
+                        <div><p className="font-medium text-gray-700">Mis à jour le</p><p>{new Date(jeu.mis_a_jour_le ?? jeu.cree_le).toLocaleDateString('fr-FR')}</p></div>
                         <div><p className="font-medium text-gray-700">Téléchargements</p><p>{telechargementsTotaux}</p></div>
                       </div>
                     )}

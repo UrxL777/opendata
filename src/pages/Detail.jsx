@@ -355,8 +355,8 @@ export default function Detail() {
           </div>
         )}
         <div className="bg-white border border-gray-100 rounded-xl p-4">
-          <p className="text-gray-400 text-xs mb-1">Mise à jour:</p>
-          <p className="font-medium">{new Date(jeu.cree_le).toLocaleDateString('fr-FR')}</p>
+          <p className="text-gray-400 text-xs mb-1">Mis à jour le</p>
+          <p className="font-medium">{new Date(jeu.mis_a_jour_le ?? jeu.cree_le).toLocaleDateString('fr-FR')}</p>
         </div>
         {jeu.categories && (
           <div className="bg-white border border-gray-100 rounded-xl p-4">

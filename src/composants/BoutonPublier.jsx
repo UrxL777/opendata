@@ -114,7 +114,7 @@ function FormulaireDataset({ onFermer }) {
 
       if (doublon && jeuIdExistant) {
         jeuId = jeuIdExistant
-        await supabase.from('jeux_de_donnees').update({ titre, description, source, categorie_id: categorieId || null, hash_fichier }).eq('id', jeuId)
+        await supabase.from('jeux_de_donnees').update({ titre, description, source, categorie_id: categorieId || null, hash_fichier, mis_a_jour_le: new Date().toISOString() }).eq('id', jeuId)
         const { data: anciensFichiers } = await supabase.from('fichiers').select('id, format').eq('jeu_de_donnees_id', jeuId)
         const ancienMemFormat = anciensFichiers?.find(f => f.format === ext)
         if (ancienMemFormat) {
