@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Database, BarChart2, Link, Code, Upload, X, Plus, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Database, BarChart2, Link, Code, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
 import { useNavigate } from 'react-router-dom'
@@ -24,11 +24,15 @@ function IcôneOeil({ visible }) {
 
 // ─── Formulaire jeu de données ────────────────────────────────────────────────
 
+const NOMS_FORMATS = { csv: 'CSV', xlsx: 'Excel', xls: 'Excel', json: 'JSON' }
+
 function FormulaireDataset({ onFermer }) {
   const { utilisateur } = useAuthentification()
   const navigate = useNavigate()
   const inputRef = useRef()
   const controleurRef = useRef(null)
+  const suggestionRef = useRef({})
+  const choixRef = useRef(null)
 
   const [categories, setCategories] = useState([])
   const [titre, setTitre] = useState('')
@@ -38,6 +42,9 @@ function FormulaireDataset({ onFermer }) {
   const [fichier, setFichier] = useState(null)
   const [chargement, setChargement] = useState(false)
   const [analyse, setAnalyse] = useState(false)
+  const [verification, setVerification] = useState(false)
+  const [comparaison, setComparaison] = useState(null)
+  const [choix, setChoix] = useState(null)
   const [erreur, setErreur] = useState('')
   const [avertissementGlobal, setAvertissementGlobal] = useState('')
 
@@ -45,66 +52,115 @@ function FormulaireDataset({ onFermer }) {
     supabase.from('categories').select('*').then(({ data }) => setCategories(data ?? []))
   }, [])
 
-  async function choisirFichier(f) {
-    if (!f) return
-    if (controleurRef.current) controleurRef.current.abort()
-    setFichier(f)
+  function viderFormulaire() {
     setTitre('')
     setDescription('')
+    setSource('')
     setCategorieId('')
     setErreur('')
     setAvertissementGlobal('')
+    setComparaison(null)
+    setChoix(null)
+    choixRef.current = null
+    suggestionRef.current = {}
+  }
+
+  function annuler() {
+    if (controleurRef.current) controleurRef.current.abort()
+    viderFormulaire()
+    setFichier(null)
+    setAnalyse(false)
+    setVerification(false)
+  }
+
+  async function choisirFichier(f) {
+    if (!f) return
+    if (controleurRef.current) controleurRef.current.abort()
+    viderFormulaire()
+    setFichier(f)
     setAnalyse(true)
+    setVerification(true)
     const controleur = new AbortController()
     controleurRef.current = controleur
-    try {
+
+    // Suggestions de l'IA (titre, description, catégorie)
+    const suggestions = (async () => {
       const form = new FormData()
       form.append('fichier', f)
       const rep = await fetch(`${import.meta.env.VITE_API_URL}/suggerer`, { method: 'POST', body: form, signal: controleur.signal })
-      if (rep.ok) {
-        const s = await rep.json()
-        setTitre(s.titre || '')
-        setDescription(s.description || '')
-        if (s.categorie_id) setCategorieId(String(s.categorie_id))
+      if (!rep.ok) return
+      const s = await rep.json()
+      suggestionRef.current = { titre: s.titre || '', description: s.description || '', categorieId: s.categorie_id ? String(s.categorie_id) : '' }
+      // On ne remplace pas les informations du jeu existant si l'utilisateur a choisi de le mettre à jour
+      if (choixRef.current !== 'maj') appliquerValeurs(suggestionRef.current)
+    })().catch(() => {}).finally(() => {
+      if (controleurRef.current === controleur) setAnalyse(false)
+    })
+
+    // Comparaison avec les jeux déjà publiés par l'utilisateur
+    const verificationDoublon = (async () => {
+      const form = new FormData()
+      form.append('fichier', f)
+      const rep = await fetch(`${import.meta.env.VITE_API_URL}/verifier-doublon?utilisateur_id=${utilisateur.id}`, { method: 'POST', body: form, signal: controleur.signal })
+      if (!rep.ok) return
+      const resultat = await rep.json()
+      setComparaison(resultat)
+      if (resultat.doublon_global && resultat.format_doublon) {
+        setAvertissementGlobal(`Un jeu de données similaire existe déjà sur la plateforme en ${resultat.format_doublon.toUpperCase()}. Vous pouvez quand même publier le vôtre.`)
       }
-    } catch (err) {
-      if (err.name !== 'AbortError') {}
-    } finally {
-      setAnalyse(false)
+    })().catch(() => {}).finally(() => {
+      if (controleurRef.current === controleur) setVerification(false)
+    })
+
+    await Promise.all([suggestions, verificationDoublon])
+  }
+
+  function appliquerValeurs({ titre = '', description = '', source = '', categorieId = '' }) {
+    setTitre(titre)
+    setDescription(description)
+    setSource(source)
+    setCategorieId(categorieId)
+  }
+
+  function choisir(valeur) {
+    setChoix(valeur)
+    choixRef.current = valeur
+    if (valeur === 'maj') {
+      const jeu = comparaison.jeu
+      appliquerValeurs({
+        titre: jeu.titre || '',
+        description: jeu.description || '',
+        source: jeu.source || '',
+        categorieId: jeu.categorie_id ? String(jeu.categorie_id) : '',
+      })
+    } else {
+      appliquerValeurs(suggestionRef.current)
     }
   }
 
   function titreVersNomFichier(t, ext) {
-    const base = t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const base = t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
     return `${base}.${ext}`
   }
 
+  const resultat = comparaison?.resultat
+  const bloque = resultat === 'identique_meme_format'
+  const choixRequis = resultat === 'identique_autre_format' || resultat === 'nouvelle_version'
+  const peutPublier = !!fichier && !verification && !bloque && (!choixRequis || !!choix) && !chargement
+  const extension = fichier?.name.split('.').pop().toLowerCase()
+
   async function publier(e) {
     e.preventDefault()
     if (!fichier) { setErreur('Veuillez sélectionner un fichier.'); return }
+    if (!peutPublier) return
     setErreur('')
     setChargement(true)
     try {
-      const formDoublon = new FormData()
-      formDoublon.append('fichier', fichier)
-      const repDoublon = await fetch(`${import.meta.env.VITE_API_URL}/verifier-doublon?utilisateur_id=${utilisateur.id}`, { method: 'POST', body: formDoublon })
-      const { doublon, jeu_id: jeuIdExistant, hash_fichier, doublon_global, format_doublon } = await repDoublon.json()
-
-      if (doublon_global && format_doublon) {
-        setAvertissementGlobal(`Un jeu de données similaire existe déjà sur la plateforme en ${format_doublon.toUpperCase()}. Vous pouvez quand même publier le vôtre.`)
-      }
-
-      const ext = fichier.name.split('.').pop().toLowerCase()
+      const ext = extension
       const nomFichier = titre ? titreVersNomFichier(titre, ext) : fichier.name
-
-      if (doublon && jeuIdExistant) {
-        const { data: anciensFichiers } = await supabase.from('fichiers').select('id, chemin_stockage, format').eq('jeu_de_donnees_id', jeuIdExistant)
-        const ancienMemFormat = anciensFichiers?.find(f => f.format === ext)
-        if (ancienMemFormat?.chemin_stockage) {
-          await supabase.storage.from('jeux-donnees').remove([ancienMemFormat.chemin_stockage])
-        }
-      }
+      const hash_fichier = comparaison?.hash_fichier ?? null
+      const jeuAMettreAJour = choixRequis && choix === 'maj' ? comparaison.jeu : null
 
       const cheminFichier = `${utilisateur.id}/${Date.now()}_${nomFichier}`
       const { error: erreurUpload } = await supabase.storage.from('jeux-donnees').upload(cheminFichier, fichier)
@@ -112,17 +168,22 @@ function FormulaireDataset({ onFermer }) {
 
       let jeuId
 
-      if (doublon && jeuIdExistant) {
-        jeuId = jeuIdExistant
-        await supabase.from('jeux_de_donnees').update({ titre, description, source, categorie_id: categorieId || null, hash_fichier }).eq('id', jeuId)
-        const { data: anciensFichiers } = await supabase.from('fichiers').select('id, format').eq('jeu_de_donnees_id', jeuId)
-        const ancienMemFormat = anciensFichiers?.find(f => f.format === ext)
-        if (ancienMemFormat) {
-          await supabase.from('fichiers').update({ nom_fichier: nomFichier, chemin_stockage: cheminFichier, taille: fichier.size }).eq('id', ancienMemFormat.id)
+      if (jeuAMettreAJour) {
+        // Mise à jour : on remplace le fichier du même format, on garde les autres formats
+        jeuId = jeuAMettreAJour.id
+        await supabase.from('jeux_de_donnees').update({ titre, description, source, categorie_id: categorieId || null, hash_fichier, mis_a_jour_le: new Date().toISOString() }).eq('id', jeuId)
+        const { data: anciensFichiers } = await supabase.from('fichiers').select('id, format, chemin_stockage').eq('jeu_de_donnees_id', jeuId)
+        const ancienMemeFormat = anciensFichiers?.find(f => f.format === ext)
+        if (ancienMemeFormat) {
+          await supabase.from('fichiers').update({ nom_fichier: nomFichier, chemin_stockage: cheminFichier, taille: fichier.size }).eq('id', ancienMemeFormat.id)
+          if (ancienMemeFormat.chemin_stockage) {
+            await supabase.storage.from('jeux-donnees').remove([ancienMemeFormat.chemin_stockage])
+          }
         } else {
           await supabase.from('fichiers').insert({ nom_fichier: nomFichier, chemin_stockage: cheminFichier, format: ext, taille: fichier.size, jeu_de_donnees_id: jeuId })
         }
       } else {
+        // Nouveau jeu de données
         const { data: jeu, error: erreurJeu } = await supabase.from('jeux_de_donnees').insert({ titre, description, source, categorie_id: categorieId || null, utilisateur_id: utilisateur.id, hash_fichier, visible: true }).select().single()
         if (erreurJeu) { setErreur(erreurJeu.message); setChargement(false); return }
         jeuId = jeu.id
@@ -141,6 +202,11 @@ function FormulaireDataset({ onFermer }) {
       setChargement(false)
     }
   }
+
+  const classeBoutonChoix = (actif) =>
+    `flex-1 text-xs font-medium px-3 py-2 rounded-lg border transition-colors ${actif
+      ? 'bg-blue-600 border-blue-600 text-white'
+      : 'bg-white border-blue-300 text-blue-700 hover:bg-blue-100'}`
 
   return (
     <form onSubmit={publier} className="p-5 space-y-4">
@@ -161,7 +227,58 @@ function FormulaireDataset({ onFermer }) {
         )}
       </div>
 
+      {!fichier && (
+        <p className="text-xs text-gray-500 text-center">
+          💡 Vous avez modifié un fichier déjà publié ? Déposez simplement la nouvelle version : nous la reconnaîtrons automatiquement.
+        </p>
+      )}
+
       {analyse && <p className="text-sm text-blue-600 text-center">Analyse en cours...</p>}
+
+      {bloque && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-3 space-y-2">
+          <div className="flex gap-2">
+            <XCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-800">
+              Vous avez déjà publié ce fichier : <strong>« {comparaison.jeu?.titre} »</strong>. Les doublons ne sont pas acceptés.
+            </p>
+          </div>
+          <button type="button" onClick={annuler}
+            className="w-full text-xs font-medium px-3 py-2 rounded-lg border border-red-300 text-red-700 bg-white hover:bg-red-100">
+            Annuler
+          </button>
+        </div>
+      )}
+
+      {resultat === 'identique_autre_format' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 space-y-2">
+          <div className="flex gap-2">
+            <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-800">
+              Ce fichier a le même contenu que votre jeu <strong>« {comparaison.jeu?.titre} »</strong>. Il sera ajouté au format {NOMS_FORMATS[extension] ?? extension?.toUpperCase()}.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => choisir('maj')} className={classeBoutonChoix(choix === 'maj')}>Ajouter à ce jeu</button>
+            <button type="button" onClick={annuler} className={classeBoutonChoix(false)}>Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {resultat === 'nouvelle_version' && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 space-y-2">
+          <div className="flex gap-2">
+            <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-800">
+              Ce fichier ressemble à votre jeu <strong>« {comparaison.jeu?.titre} »</strong> ({Math.round(comparaison.pct_lignes)} % de lignes identiques).
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => choisir('maj')} className={classeBoutonChoix(choix === 'maj')}>Mettre à jour ce jeu</button>
+            <button type="button" onClick={() => choisir('nouveau')} className={classeBoutonChoix(choix === 'nouveau')}>Publier comme nouveau jeu</button>
+          </div>
+        </div>
+      )}
 
       {avertissementGlobal && (
         <div className="flex gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
@@ -201,9 +318,9 @@ function FormulaireDataset({ onFermer }) {
 
       {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
 
-      <button type="submit" disabled={chargement || !fichier}
+      <button type="submit" disabled={!peutPublier}
         className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-lg font-medium text-sm">
-        {chargement ? 'Publication...' : 'Publier'}
+        {chargement ? 'Publication...' : verification ? 'Vérification...' : 'Publier'}
       </button>
     </form>
   )
@@ -531,8 +648,8 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                     <BarChart2 size={22} className="text-purple-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Visualisation</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Partager un graphique ou un dashboard</p>
+                    <p className="font-semibold text-sm">Dashboard</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Partager un dashboard interactif (Power BI, Tableau, Looker Studio…)</p>
                   </div>
                 </button>
               </div>

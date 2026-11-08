@@ -12,7 +12,7 @@ function PanneauAffichage({ visu }) {
     return (
       <div className="flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-gray-200 min-h-[400px]">
         <FileImage size={48} className="text-gray-200 mb-3" />
-        <p className="text-gray-400 text-sm">Sélectionnez une visualisation</p>
+        <p className="text-gray-400 text-sm">Sélectionnez un dashboard</p>
       </div>
     )
   }
@@ -96,7 +96,7 @@ export default function Visualisation() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Visualisations</h1>
+      <h1 className="text-2xl font-bold mb-6">Dashboards</h1>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
@@ -104,7 +104,7 @@ export default function Visualisation() {
           <input
             value={recherche}
             onChange={e => setRecherche(e.target.value)}
-            placeholder="Rechercher une visualisation..."
+            placeholder="Rechercher un dashboard..."
             className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -132,7 +132,7 @@ export default function Visualisation() {
       ) : visualisations.length === 0 ? (
         <div className="text-center py-16">
           <FileImage size={40} className="mx-auto mb-3 text-gray-200" />
-          <p className="text-gray-400 text-sm">Aucune visualisation disponible.</p>
+          <p className="text-gray-400 text-sm">Aucun dashboard disponible.</p>
         </div>
       ) : (
         <PanneauAffichage visu={visuSelectionnee} />

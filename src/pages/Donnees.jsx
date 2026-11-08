@@ -99,7 +99,7 @@ export default function Donnees() {
     <div>
       <main className="max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-3xl font-extrabold text-gray-900 mb-1">Catalogue de données</h1>
-        <p className="text-gray-500 mb-8">Explorez et téléchargez des jeux de données en formats ouverts et réutilisables.</p>
+        <p className="text-gray-500 mb-8">Explorez et téléchargez gratuitement des jeux de données aux formats CSV, Excel et JSON, sans créer de compte.</p>
 
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-4 py-2 bg-white mb-4">
           <Search size={18} className="text-gray-400" />
@@ -138,7 +138,7 @@ export default function Donnees() {
                   <div key={jeu.id} className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
                     <div className="flex gap-3">
                       <div className="bg-blue-50 p-2 rounded-xl shrink-0 h-fit">
-                        <IconeCategorie nom={jeu.categories?.nom} size={20} className="text-blue-600" />
+                        <IconeCategorie taille={20} className="text-blue-600" />
                       </div>
                       <div>
                         <h3 className="font-bold text-gray-900">{jeu.titre}</h3>
@@ -170,7 +170,7 @@ export default function Donnees() {
                     {fichiers.length > 0 && (
                       <div className="grid grid-cols-3 text-xs text-gray-500 gap-2">
                         <div><p className="font-medium text-gray-700">Taille</p><p>{formaterTaille(tailleTotale)}</p></div>
-                        <div><p className="font-medium text-gray-700">Mis à jour</p><p>{new Date(jeu.cree_le).toLocaleDateString('fr-FR')}</p></div>
+                        <div><p className="font-medium text-gray-700">Mis à jour le</p><p>{new Date(jeu.mis_a_jour_le ?? jeu.cree_le).toLocaleDateString('fr-FR')}</p></div>
                         <div><p className="font-medium text-gray-700">Téléchargements</p><p>{telechargementsTotaux}</p></div>
                       </div>
                     )}

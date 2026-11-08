@@ -46,7 +46,7 @@ export default function PiedDePage() {
             <LogOpenData tailleIcone={23} tailleTexte="1.1rem" couleurTexte="white" mode="sombre" />
           </div>
           <p className="text-sm text-gray-400">
-            Une plateforme communautaire pour partager et explorer des données de tout genre sous s'importe quel format.
+            Une plateforme communautaire pour partager et explorer des données ouvertes aux formats CSV, Excel et JSON.
           </p>
         </div>
 
@@ -56,7 +56,7 @@ export default function PiedDePage() {
           <ul className="space-y-2 text-sm">
             <li><Link to="/" className="hover:text-white">Accueil</Link></li>
             <li><Link to="/donnees" className="hover:text-white">Données</Link></li>
-            <li><Link to="/visualisation" className="hover:text-white">Visualisation</Link></li>
+            <li><Link to="/visualisation" className="hover:text-white">Dashboards</Link></li>
           </ul>
         </div>
 

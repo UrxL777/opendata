@@ -160,8 +160,8 @@ function PanneauChat({ jeuId, estMobile, afficherHeader = true }) {
     <div className="flex flex-col h-full">
       {afficherHeader && (
         <div className="p-3 border-b border-gray-200 shrink-0">
-          <p className="font-semibold text-gray-800 text-sm">Analyste IA</p>
-          <p className="text-xs text-gray-400">Questions sur ce dataset</p>
+          <p className="font-semibold text-gray-800 text-sm">Atlas</p>
+          <p className="text-xs text-gray-400">Questions sur ce jeu de données</p>
         </div>
       )}
 
@@ -244,7 +244,7 @@ function PanneauChat({ jeuId, estMobile, afficherHeader = true }) {
           </button>
         </div>
         <p className="text-xs text-gray-400 mt-2 text-center">
-          DataGuide est une IA et peut commettre des erreurs !
+          Atlas est une IA et peut commettre des erreurs !
         </p>
       </div>
     </div>
@@ -328,7 +328,7 @@ export default function Detail() {
 
       <div className="flex gap-4 mb-6">
         <div className="bg-blue-50 p-3 rounded-xl shrink-0 h-fit">
-          <IconeCategorie nom={jeu.categories?.nom} size={28} className="text-blue-600" />
+          <IconeCategorie taille={28} className="text-blue-600" />
         </div>
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">{jeu.titre}</h1>
@@ -355,8 +355,8 @@ export default function Detail() {
           </div>
         )}
         <div className="bg-white border border-gray-100 rounded-xl p-4">
-          <p className="text-gray-400 text-xs mb-1">Mise à jour:</p>
-          <p className="font-medium">{new Date(jeu.cree_le).toLocaleDateString('fr-FR')}</p>
+          <p className="text-gray-400 text-xs mb-1">Mis à jour le</p>
+          <p className="font-medium">{new Date(jeu.mis_a_jour_le ?? jeu.cree_le).toLocaleDateString('fr-FR')}</p>
         </div>
         {jeu.categories && (
           <div className="bg-white border border-gray-100 rounded-xl p-4">
@@ -403,7 +403,7 @@ export default function Detail() {
             className="fixed bottom-6 right-4 flex items-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-full shadow-lg text-sm font-semibold z-40"
           >
             <MessageCircle size={16} />
-            Analyste IA
+            Atlas
           </button>
         )}
 
@@ -430,8 +430,8 @@ export default function Detail() {
                 <MessageCircle size={16} className="text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-gray-800 text-sm">Analyste IA</p>
-                <p className="text-xs text-gray-400">Questions sur ce dataset</p>
+                <p className="font-semibold text-gray-800 text-sm">Atlas</p>
+                <p className="text-xs text-gray-400">Questions sur ce jeu de données</p>
               </div>
               <button
                 onClick={() => setSheetPleinEcran(!sheetPleinEcran)}
@@ -505,7 +505,7 @@ export default function Detail() {
                 className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-2 py-1.5 transition-colors"
               >
                 <PanelLeftOpen size={14} />
-                Ouvrir l'agent
+                Ouvrir Atlas
               </button>
             </div>
           )}

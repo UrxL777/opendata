@@ -73,7 +73,7 @@ export default function Navigation() {
           <nav className="flex items-center gap-8">
             <Link to="/" className={`text-sm font-medium ${lienActif('/')}`}>Accueil</Link>
             <Link to="/donnees" className={`text-sm font-medium ${lienActif('/donnees')}`}>Données</Link>
-            <Link to="/visualisation" className={`text-sm font-medium ${lienActif('/visualisation')}`}>Visualisation</Link>
+            <Link to="/visualisation" className={`text-sm font-medium ${lienActif('/visualisation')}`}>Dashboards</Link>
           </nav>
           <BoutonPublier />
         </div>
@@ -93,7 +93,7 @@ export default function Navigation() {
             </Link>
             <Link to="/visualisation" onClick={fermerMenu}
               className={`text-sm font-medium py-3 border-b border-gray-100 ${lienActifMobile('/visualisation')}`}>
-              Visualisation
+              Dashboards
             </Link>
             <div className="pt-3 pb-2">
               <BoutonPublier onVisualisationPubliee={fermerMenu} />
