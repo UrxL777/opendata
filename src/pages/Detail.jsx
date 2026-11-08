@@ -328,7 +328,7 @@ export default function Detail() {
 
       <div className="flex gap-4 mb-6">
         <div className="bg-blue-50 p-3 rounded-xl shrink-0 h-fit">
-          <IconeCategorie nom={jeu.categories?.nom} size={28} className="text-blue-600" />
+          <IconeCategorie taille={28} className="text-blue-600" />
         </div>
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">{jeu.titre}</h1>

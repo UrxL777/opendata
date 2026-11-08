@@ -176,13 +176,6 @@ def construire_contexte(jeu_id: str) -> str:
         return f"Erreur lors de la récupération du contexte : {e}"
 
 
-# ─── Message d'accueil ────────────────────────────────────────────────────────
-
-def accueil(jeu_id: str) -> str:
-    """Pas de message d'accueil — l'utilisateur pose directement sa question."""
-    return ""
-
-
 # ─── Suggestion de titre, description et catégorie (appelée à l'upload) ────────
 
 def suggerer(chemin: str, nom_fichier: str) -> dict:

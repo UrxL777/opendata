@@ -138,7 +138,7 @@ export default function Donnees() {
                   <div key={jeu.id} className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
                     <div className="flex gap-3">
                       <div className="bg-blue-50 p-2 rounded-xl shrink-0 h-fit">
-                        <IconeCategorie nom={jeu.categories?.nom} size={20} className="text-blue-600" />
+                        <IconeCategorie taille={20} className="text-blue-600" />
                       </div>
                       <div>
                         <h3 className="font-bold text-gray-900">{jeu.titre}</h3>

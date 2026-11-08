@@ -106,7 +106,7 @@ export default function Accueil() {
             >
               <div className="flex justify-center mb-3">
                 <div className="bg-blue-50 p-3 rounded-full">
-                  <IconeCategorie nom={cat.nom} size={22} className="text-blue-600" />
+                  <IconeCategorie taille={22} className="text-blue-600" />
                 </div>
               </div>
               <p className="font-semibold text-gray-800 text-sm">{cat.nom}</p>
