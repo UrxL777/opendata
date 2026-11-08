@@ -56,11 +56,13 @@ def pourcentage_lignes_communes(df_ancien: pd.DataFrame, df_nouveau: pd.DataFram
 def comparer(df_ancien: pd.DataFrame, df_nouveau: pd.DataFrame) -> dict:
     """Point d'entrée : le nouveau fichier est-il une nouvelle version de l'ancien ?"""
     if not memes_colonnes(df_ancien.columns, df_nouveau.columns):
-        return {"nouvelle_version": False, "memes_colonnes": False, "pct_lignes": 0.0}
+        return {"nouvelle_version": False, "memes_colonnes": False, "pct_lignes": 0.0, "identique": False}
 
     pct_lignes = pourcentage_lignes_communes(df_ancien, df_nouveau)
     return {
         "nouvelle_version": pct_lignes >= SEUIL_LIGNES,
         "memes_colonnes": True,
         "pct_lignes": pct_lignes,
+        # Mêmes colonnes, toutes les lignes retrouvées et même nombre de lignes = même contenu
+        "identique": pct_lignes == 100.0 and len(df_ancien) == len(df_nouveau),
     }

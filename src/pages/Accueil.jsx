@@ -70,6 +70,9 @@ export default function Accueil() {
             <Search size={18} /> Explorer les données
           </Link>
         </div>
+        <p className="text-xs text-gray-400 mt-6 max-w-md mx-auto">
+          Vous avez modifié un jeu de données déjà publié ? Redéposez simplement la nouvelle version : elle sera reconnue automatiquement.
+        </p>
       </section>
 
       <section className="py-16 px-4 bg-white text-center">
