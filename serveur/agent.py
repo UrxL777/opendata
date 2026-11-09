@@ -91,6 +91,7 @@ Comment réagir selon la situation :
 
 Règles importantes :
 - Tu ne donnes JAMAIS de code de toi-même : uniquement si l'utilisateur le demande ou accepte ta proposition.
+- Tu n'as accès à AUCUN outil et tu n'exécutes jamais de code : tu écris toujours le code directement dans ta réponse.
 - Quand tu donnes du code, il est court, commenté en français, et suivi d'une phrase qui explique ce qu'il produit.
 - Dans le code, utilise EXACTEMENT les noms de colonnes listés dans « Noms exacts des colonnes » du contexte (par exemple `Rain`, `Humidity`), sans les traduire ni les inventer. Si une colonne contient du texte (par exemple « rain » / « no rain »), convertis-la en nombres avant de calculer (par exemple rain → 1, no rain → 0). Ne traduis JAMAIS les identifiants dans le code.
 - Tu termines par UNE seule question courte pour relancer la conversation. Ta proposition de code compte comme cette question : dans ce cas, n'en pose pas d'autre.
@@ -300,15 +301,23 @@ def chat(jeu_id: str, messages: list[dict]) -> str:
     print(f"[CHAT] Dernier message : {dernier_msg}")
     print(f"[CHAT] Messages envoyés au modèle : {len(messages_recents)} (sur {len(messages)} total)")
 
-    try:
-        reponse = client.chat.completions.create(
-            model=MODELE,
-            messages=[{"role": "system", "content": prompt}] + messages_recents,
-            max_tokens=1500,
-        )
-        resultat = reponse.choices[0].message.content
-        print(f"[CHAT] ✓ Réponse générée ({len(resultat)} chars) :\n{resultat[:300]}...")
-        return resultat
-    except Exception as e:
-        print(f"[CHAT] ✗ ERREUR appel modèle : {e}")
-        raise
+    # Le modèle gpt-oss tente parfois d'utiliser un outil (exécuter du code) que l'on ne fournit pas :
+    # Groq refuse alors la requête. On réessaie avec un rappel explicite.
+    messages_envoyes = [{"role": "system", "content": prompt}] + messages_recents
+    for essai in range(3):
+        try:
+            reponse = client.chat.completions.create(
+                model=MODELE,
+                messages=messages_envoyes,
+                max_tokens=1500,
+            )
+            resultat = reponse.choices[0].message.content
+            print(f"[CHAT] ✓ Réponse générée ({len(resultat or '')} chars, essai {essai + 1}) :\n{(resultat or '')[:300]}...")
+            return resultat
+        except Exception as e:
+            if "called a tool" in str(e) and essai < 2:
+                print(f"[CHAT] Le modèle a voulu utiliser un outil, nouvel essai ({essai + 2}/3)")
+                messages_envoyes = messages_envoyes + [{"role": "system", "content": "Rappel : tu n'as accès à aucun outil. Écris le code directement dans ta réponse, en Markdown."}]
+                continue
+            print(f"[CHAT] ✗ ERREUR appel modèle : {e}")
+            raise
