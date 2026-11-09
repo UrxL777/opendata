@@ -188,9 +188,11 @@ function PanneauChat({ jeuId, estMobile, afficherHeader = true }) {
                     ul: ({ children }) => <ul className="list-disc ml-4 space-y-0.5 my-1">{children}</ul>,
                     ol: ({ children }) => <ol className="list-decimal ml-4 space-y-0.5 my-1">{children}</ol>,
                     li: ({ children }) => <li>{children}</li>,
-                    code: ({ inline, children }) => inline
-                      ? <code className="bg-gray-100 px-1 rounded text-xs font-mono">{children}</code>
-                      : <pre className="bg-gray-100 rounded p-2 text-xs font-mono overflow-x-auto my-1 whitespace-pre-wrap">{children}</pre>,
+                    // Bloc de code (plusieurs lignes) : grand cadre ; petit morceau dans une phrase : reste dans la phrase
+                    pre: ({ children }) => <pre className="bg-gray-100 rounded p-2 text-xs font-mono overflow-x-auto my-1 whitespace-pre-wrap">{children}</pre>,
+                    code: ({ className, children }) => (className || String(children).includes('\n'))
+                      ? <code className="font-mono">{children}</code>
+                      : <code className="bg-gray-100 px-1 py-0.5 rounded text-[0.85em] font-mono">{children}</code>,
                     p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
                     table: ({ children }) => (
                       <div className="overflow-x-auto my-2">
