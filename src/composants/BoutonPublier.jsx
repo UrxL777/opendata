@@ -381,8 +381,8 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
     e.preventDefault()
     if (!titre.trim()) { setErreur('Le titre est obligatoire.'); return }
     if (!categorie) { setErreur('La catégorie est obligatoire.'); return }
-    if (!codeEmbed.trim()) { setErreur('Le code d\u2019intégration est obligatoire.'); return }
-    if (!codeValide(codeEmbed)) { setErreur('Code d\u2019intégration invalide : il doit commencer par <iframe et contenir une adresse https://'); return }
+    if (!codeEmbed.trim()) { setErreur('Le code d’intégration est obligatoire.'); return }
+    if (!codeValide(codeEmbed)) { setErreur('Code d’intégration invalide : il doit commencer par <iframe et contenir une adresse https://'); return }
     setErreur('')
     setChargement(true)
     try {
@@ -417,11 +417,19 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">Code d\u2019intégration *</label>
+        <label className="block text-sm font-medium mb-1">Code d’intégration *</label>
         <textarea value={codeEmbed} onChange={e => setCodeEmbed(e.target.value)} rows={4}
           placeholder='<iframe src="https://..." ...></iframe>'
           className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" />
-        <p className="text-xs text-gray-400 mt-1">Collez le code d\u2019intégration (iframe) fourni par Power BI, Tableau Public ou Looker Studio.</p>
+        <p className="text-xs text-gray-400 mt-1">Collez le code d’intégration (iframe) fourni par Power BI, Tableau Public ou Looker Studio.</p>
+        <details className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+          <summary className="cursor-pointer font-medium text-blue-600">Où trouver ce code ?</summary>
+          <ul className="mt-2 space-y-1.5 list-disc pl-4">
+            <li><strong>Power BI</strong> : Fichier → Incorporer le rapport → Publier sur le web → copier le code &lt;iframe&gt;</li>
+            <li><strong>Looker Studio</strong> : Partager → Intégrer le rapport → copier le code d’intégration</li>
+            <li><strong>Tableau Public</strong> : bouton Partager sous le dashboard → copier le code d’intégration</li>
+          </ul>
+        </details>
       </div>
       {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
       <button type="submit" disabled={chargement}
