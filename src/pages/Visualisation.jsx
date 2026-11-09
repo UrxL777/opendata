@@ -22,7 +22,9 @@ function lireIframe(code) {
   return { src, ratio }
 }
 
-// Calcule la plus grande taille qui tient dans l'écran sans défilement, en gardant les proportions
+// Comme Data Ivoire : le cadre prend la largeur disponible (centré, 1400 px au maximum)
+// et la hauteur qui correspond aux proportions du dashboard. On fait défiler la page, pas le cadre.
+const LARGEUR_MAX = 1400
 function useTailleAjustee(zoneRef, ratio) {
   const [taille, setTaille] = useState({ largeur: 0, hauteur: 0 })
 
@@ -30,14 +32,11 @@ function useTailleAjustee(zoneRef, ratio) {
     function calculer() {
       const zone = zoneRef.current
       if (!zone) return
-      const largeurDispo = zone.clientWidth
-      const hauteurDispo = Math.max(200, window.innerHeight - zone.getBoundingClientRect().top - 16)
-      let largeur = largeurDispo
+      const styles = getComputedStyle(zone)
+      const largeur = Math.min(LARGEUR_MAX, zone.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight))
       let hauteur = largeur / ratio
-      if (hauteur > hauteurDispo) {
-        hauteur = hauteurDispo
-        largeur = hauteur * ratio
-      }
+      // Sur téléphone, un dashboard au format écran large deviendrait très plat : hauteur minimale
+      if (window.innerWidth < 640) hauteur = Math.max(hauteur, window.innerHeight * 0.7)
       setTaille({ largeur: Math.floor(largeur), hauteur: Math.floor(hauteur) })
     }
     calculer()
