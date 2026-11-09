@@ -51,14 +51,12 @@ function useTailleAjustee(zoneRef, ratio) {
 function PanneauAffichage({ visu }) {
   const zoneRef = useRef(null)
   const cadreRef = useRef(null)
-  const [ratioImage, setRatioImage] = useState(null)
   const [pleinEcran, setPleinEcran] = useState(false)
 
+  // Seuls les codes d'intégration (iframe) sont acceptés
   const iframe = lireIframe(visu?.code_embed)
-  const estImage = !!visu?.url_fichier && /\.(png|jpg|jpeg|svg)$/i.test(visu.nom_fichier ?? '')
-  const estLien = !!visu?.lien_url
-  const adresse = iframe?.src ?? (estLien ? visu.lien_url : estImage ? visu.url_fichier : null)
-  const ratio = estImage ? (ratioImage ?? RATIO_PAR_DEFAUT) : (iframe?.ratio ?? RATIO_PAR_DEFAUT)
+  const adresse = iframe?.src ?? null
+  const ratio = iframe?.ratio ?? RATIO_PAR_DEFAUT
   const taille = useTailleAjustee(zoneRef, ratio)
   const pleinEcranPossible = typeof document !== 'undefined' && document.fullscreenEnabled
 
@@ -99,7 +97,7 @@ function PanneauAffichage({ visu }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {pleinEcranPossible && (iframe || estLien || estImage) && (
+          {pleinEcranPossible && iframe && (
             <button type="button" onClick={basculerPleinEcran}
               title="Plein écran" aria-label="Plein écran"
               className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-blue-600 border border-gray-200 rounded-lg px-2.5 py-1.5">
@@ -118,17 +116,14 @@ function PanneauAffichage({ visu }) {
 
       <div ref={zoneRef} className="w-full flex justify-center bg-gray-50 p-1 sm:p-2">
         <div ref={cadreRef} style={styleCadre} className="bg-white">
-          {iframe || estLien ? (
+          {iframe ? (
             <iframe
-              src={iframe?.src ?? visu.lien_url}
+              src={iframe.src}
               title={visu.titre}
               className="w-full h-full border-0"
               allowFullScreen
               sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             />
-          ) : estImage ? (
-            <img src={visu.url_fichier} alt={visu.titre} className="w-full h-full object-contain"
-              onLoad={e => setRatioImage(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)} />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-300">
               <p className="text-sm">Aucun contenu à afficher</p>

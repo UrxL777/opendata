@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Database, BarChart2, Link, Code, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
+import { Database, BarChart2, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
 import { traduireErreurAuth } from '../utilitaires/erreursAuth'
@@ -364,42 +364,29 @@ function FormulaireDataset({ onFermer }) {
 
 function FormulaireVisualisation({ onFermer, onPublie }) {
   const { utilisateur } = useAuthentification()
-  const inputRef = useRef()
-  const [typeContenu, setTypeContenu] = useState('lien')
   const [titre, setTitre] = useState('')
   const [description, setDescription] = useState('')
   const [categorie, setCategorie] = useState('')
-  const [lienUrl, setLienUrl] = useState('')
   const [codeEmbed, setCodeEmbed] = useState('')
-  const [fichier, setFichier] = useState(null)
   const [chargement, setChargement] = useState(false)
   const [erreur, setErreur] = useState('')
 
+  // Le code doit contenir une <iframe> avec une adresse https
+  function codeValide(code) {
+    const iframe = new DOMParser().parseFromString(code, 'text/html').querySelector('iframe')
+    return /^https:\/\//i.test(iframe?.getAttribute('src') ?? '')
+  }
+
   async function publier(e) {
     e.preventDefault()
-    if (!titre) { setErreur('Le titre est obligatoire.'); return }
+    if (!titre.trim()) { setErreur('Le titre est obligatoire.'); return }
     if (!categorie) { setErreur('La catégorie est obligatoire.'); return }
-    if (typeContenu === 'lien' && !lienUrl) { setErreur('Le lien est obligatoire.'); return }
-    if (typeContenu === 'embed' && !codeEmbed) { setErreur('Le code embed est obligatoire.'); return }
-    if (typeContenu === 'fichier' && !fichier) { setErreur('Veuillez sélectionner un fichier.'); return }
+    if (!codeEmbed.trim()) { setErreur('Le code d’intégration est obligatoire.'); return }
+    if (!codeValide(codeEmbed)) { setErreur('Code d’intégration invalide : il doit commencer par <iframe et contenir une adresse https://'); return }
     setErreur('')
     setChargement(true)
     try {
-      let donnees = { titre, description, categorie, utilisateur_id: utilisateur.id }
-      if (typeContenu === 'lien') {
-        donnees.lien_url = lienUrl
-      } else if (typeContenu === 'embed') {
-        donnees.code_embed = codeEmbed
-      } else {
-        const chemin = `visualisations/${utilisateur.id}/${Date.now()}_${fichier.name}`
-        const { error: errUpload } = await supabase.storage.from('jeux-donnees').upload(chemin, fichier)
-        if (errUpload) { setErreur(errUpload.message); setChargement(false); return }
-        const { data: urlData } = supabase.storage.from('jeux-donnees').getPublicUrl(chemin)
-        donnees.chemin_fichier = chemin
-        donnees.url_fichier = urlData.publicUrl
-        donnees.nom_fichier = fichier.name
-      }
-      const { error: errInsert } = await supabase.from('visualisations').insert(donnees)
+      const { error: errInsert } = await supabase.from('visualisations').insert({ titre, description, categorie, code_embed: codeEmbed.trim(), utilisateur_id: utilisateur.id })
       if (errInsert) { setErreur(errInsert.message); setChargement(false); return }
       onPublie?.()
       onFermer()
@@ -430,48 +417,20 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium mb-2">Type de contenu *</label>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { val: 'lien', icone: <Link size={15} />, label: 'Lien URL' },
-            { val: 'embed', icone: <Code size={15} />, label: 'Code embed' },
-            { val: 'fichier', icone: <Upload size={15} />, label: 'Fichier' },
-          ].map(({ val, icone, label }) => (
-            <button key={val} type="button" onClick={() => setTypeContenu(val)}
-              className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
-                typeContenu === val ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-500 hover:border-gray-300'
-              }`}>
-              {icone}{label}
-            </button>
-          ))}
-        </div>
+        <label className="block text-sm font-medium mb-1">Code d’intégration *</label>
+        <textarea value={codeEmbed} onChange={e => setCodeEmbed(e.target.value)} rows={4}
+          placeholder='<iframe src="https://..." ...></iframe>'
+          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" />
+        <p className="text-xs text-gray-400 mt-1">Collez le code d’intégration (iframe) fourni par Power BI, Tableau Public ou Looker Studio.</p>
+        <details className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+          <summary className="cursor-pointer font-medium text-blue-600">Où trouver ce code ?</summary>
+          <ul className="mt-2 space-y-1.5 list-disc pl-4">
+            <li><strong>Power BI</strong> : Fichier → Incorporer le rapport → Publier sur le web → copier le code &lt;iframe&gt;</li>
+            <li><strong>Looker Studio</strong> : Partager → Intégrer le rapport → copier le code d’intégration</li>
+            <li><strong>Tableau Public</strong> : bouton Partager sous le dashboard → copier le code d’intégration</li>
+          </ul>
+        </details>
       </div>
-      {typeContenu === 'lien' && (
-        <div>
-          <label className="block text-sm font-medium mb-1">URL *</label>
-          <input value={lienUrl} onChange={e => setLienUrl(e.target.value)} placeholder="https://..."
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
-          <p className="text-xs text-gray-400 mt-1">Power BI, Looker Studio, Tableau Public...</p>
-        </div>
-      )}
-      {typeContenu === 'embed' && (
-        <div>
-          <label className="block text-sm font-medium mb-1">Code embed *</label>
-          <textarea value={codeEmbed} onChange={e => setCodeEmbed(e.target.value)} rows={3}
-            placeholder='<iframe src="..." ...></iframe>'
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" />
-        </div>
-      )}
-      {typeContenu === 'fichier' && (
-        <div>
-          <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.pdf,.svg"
-            className="hidden" onChange={e => setFichier(e.target.files[0])} />
-          <button type="button" onClick={() => inputRef.current.click()}
-            className="w-full border-2 border-dashed border-gray-300 rounded-lg py-4 text-sm text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors">
-            {fichier ? fichier.name : 'Cliquez pour choisir un fichier'}
-          </button>
-        </div>
-      )}
       {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
       <button type="submit" disabled={chargement}
         className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-lg font-medium text-sm">
