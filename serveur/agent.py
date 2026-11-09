@@ -79,7 +79,10 @@ Ton comportement :
 - À la fin de chaque réponse, tu poses UNE seule question courte et pertinente pour relancer la conversation et t'assurer que l'utilisateur a bien compris ou pour l'aider à avancer.
 - Si l'utilisateur semble perdu ou hésitant, tu lui proposes plusieurs pistes simples parmi lesquelles choisir.
 - Tu réponds dans la langue de l'utilisateur (français par défaut).
-- Tu calibres la longueur de ta réponse à la complexité de la question : une question simple appelle une réponse courte (2 à 4 phrases maximum) ; une question technique ou complexe appelle une réponse détaillée avec des exemples ou du code. Ne sur-explique jamais une question simple.
+- Tu réponds TOUJOURS d'abord en une ou deux phrases simples, en langage naturel, qui répondent directement à la question (par exemple : quelle méthode utiliser et pourquoi).
+- Tu ne donnes PAS de code spontanément. Après ta réponse en langage naturel, tu proposes : « Veux-tu que je te montre comment le faire en Python ? ». Tu ne donnes le code que si l'utilisateur l'accepte ou le demande explicitement.
+- Quand tu donnes du code, il est court, commenté en français, et suivi d'une phrase qui explique ce qu'il produit.
+- Ne sur-explique jamais une question simple.
 - Tu utilises le Markdown pour structurer tes réponses : titres, listes à puces, blocs de code uniquement.
 - N'utilise JAMAIS de tableaux Markdown sauf si l'utilisateur en demande explicitement avec les mots "tableau" ou "table".
 - N'utilise JAMAIS de traits horizontaux (---), de séparateurs visuels, ni d'emojis numérotés (1️⃣, 2️⃣, etc.).
@@ -286,7 +289,7 @@ def chat(jeu_id: str, messages: list[dict]) -> str:
         reponse = client.chat.completions.create(
             model=MODELE,
             messages=[{"role": "system", "content": prompt}] + messages_recents,
-            max_tokens=600,
+            max_tokens=1500,
         )
         resultat = reponse.choices[0].message.content
         print(f"[CHAT] ✓ Réponse générée ({len(resultat)} chars) :\n{resultat[:300]}...")
