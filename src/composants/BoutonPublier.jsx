@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Database, BarChart2, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
+import { Database, ChartColumnBig, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
 import { traduireErreurAuth, verifierInscription } from '../utilitaires/erreursAuth'
@@ -315,9 +315,9 @@ function FormulaireDataset({ onFermer }) {
       )}
 
       {avertissementGlobal && (
-        <div className="flex gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-800">{avertissementGlobal}</p>
+        <div className="flex gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
+          <AlertTriangle size={16} className="text-blue-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-900">{avertissementGlobal}</p>
         </div>
       )}
 
@@ -689,9 +689,9 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                 </button>
 
                 <button onClick={() => setEtape('visualisation')}
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-colors text-center">
-                  <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                    <BarChart2 size={22} className="text-purple-600" />
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors text-center">
+                  <div className="w-12 h-12 rounded-full bg-blue-900 flex items-center justify-center">
+                    <ChartColumnBig size={22} className="text-white" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Dashboard</p>
