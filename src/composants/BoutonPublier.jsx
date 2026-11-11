@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Database, BarChart2, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
-import { traduireErreurAuth } from '../utilitaires/erreursAuth'
+import { traduireErreurAuth, verifierInscription } from '../utilitaires/erreursAuth'
 import { useNavigate } from 'react-router-dom'
 
 function IcôneOeil({ visible }) {
@@ -513,13 +513,15 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
   async function inscrireDepuisPublier(e) {
     e.preventDefault()
     setErreurCo('')
+    const probleme = verifierInscription(pseudoCo, emailCo, mdpCo)
+    if (probleme) { setErreurCo(probleme); return }
     setChargementCo(true)
-    const { data, error } = await supabase.auth.signUp({ email: emailCo, password: mdpCo })
+    const { error } = await supabase.auth.signUp({
+      email: emailCo.trim(),
+      password: mdpCo,
+      options: { data: { pseudo: pseudoCo }, emailRedirectTo: window.location.origin },
+    })
     if (error) { setChargementCo(false); setErreurCo(traduireErreurAuth(error.message)); return }
-    // Enregistrer le pseudo dans profiles
-    if (data?.user) {
-      await supabase.from('profiles').upsert({ id: data.user.id, pseudo: pseudoCo })
-    }
     setChargementCo(false)
     setInscriptionReussie(true)
   }
@@ -559,7 +561,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                     <p className="text-sm text-gray-500">Connectez-vous pour publier sur OpenData.</p>
                     <div>
                       <label className="block text-sm font-medium mb-1">Email</label>
-                      <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required
+                      <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required placeholder="nom@gmail.com"
                         className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
                     </div>
                     <div>
@@ -569,7 +571,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                           className="text-xs text-blue-600 hover:underline">Mot de passe oublié ?</button>
                       </div>
                       <div className="relative">
-                        <input type={mdpVisible ? 'text' : 'password'} value={mdpCo} onChange={e => setMdpCo(e.target.value)} required
+                        <input type={mdpVisible ? 'text' : 'password'} value={mdpCo} onChange={e => setMdpCo(e.target.value)} required placeholder="Votre mot de passe"
                           className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500" />
                         <button type="button" onClick={() => setMdpVisible(v => !v)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -606,7 +608,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                       <p className="text-sm text-gray-500">Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.</p>
                       <div>
                         <label className="block text-sm font-medium mb-1">Email</label>
-                        <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required
+                        <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required placeholder="nom@gmail.com"
                           className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
                       </div>
                       {erreurCo && <p className="text-red-600 text-sm">{erreurCo}</p>}
@@ -638,18 +640,18 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                       <div>
                         <label className="block text-sm font-medium mb-1">Pseudo</label>
                         <input type="text" value={pseudoCo} onChange={e => setPseudoCo(e.target.value)} required
-                          placeholder="Votre nom d'affichage"
+                          placeholder="Ex. : data_analyst225"
                           className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Email</label>
-                        <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required
+                        <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required placeholder="nom@gmail.com"
                           className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Mot de passe</label>
                         <div className="relative">
-                          <input type={mdpVisible ? 'text' : 'password'} value={mdpCo} onChange={e => setMdpCo(e.target.value)} required
+                          <input type={mdpVisible ? 'text' : 'password'} value={mdpCo} onChange={e => setMdpCo(e.target.value)} required placeholder="6 caractères minimum"
                             className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500" />
                           <button type="button" onClick={() => setMdpVisible(v => !v)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">

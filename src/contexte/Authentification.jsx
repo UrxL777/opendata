@@ -1,6 +1,17 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 
+// Supabase refuse d'écrire le profil tant que le mail n'est pas validé :
+// le pseudo est gardé avec le compte et enregistré à la première connexion.
+async function enregistrerPseudoEnAttente(utilisateur) {
+  const pseudo = utilisateur.user_metadata?.pseudo
+  if (!pseudo) return
+  const { data } = await supabase.from('profiles').select('pseudo').eq('id', utilisateur.id).maybeSingle()
+  if (!data?.pseudo) {
+    await supabase.from('profiles').upsert({ id: utilisateur.id, pseudo })
+  }
+}
+
 const ContexteAuth = createContext(null)
 
 export function FournisseurAuth({ children }) {
@@ -19,6 +30,10 @@ export function FournisseurAuth({ children }) {
 
     return () => ecouteur.subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (utilisateur) enregistrerPseudoEnAttente(utilisateur)
+  }, [utilisateur])
 
   return (
     <ContexteAuth.Provider value={{ utilisateur, chargement }}>

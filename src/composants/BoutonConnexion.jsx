@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
-import { traduireErreurAuth } from '../utilitaires/erreursAuth'
+import { traduireErreurAuth, verifierInscription } from '../utilitaires/erreursAuth'
 
 function IcôneDeconnexion() {
   return (
@@ -61,10 +61,10 @@ function BoutonUtilisateurConnecte({ utilisateur, onDeconnecter }) {
         .select('pseudo')
         .eq('id', utilisateur.id)
         .maybeSingle()
-      if (data?.pseudo) setPseudo(data.pseudo)
+      setPseudo(data?.pseudo || utilisateur.user_metadata?.pseudo || '')
     }
     chargerPseudo()
-  }, [utilisateur.id])
+  }, [utilisateur])
 
   return (
     <div className="flex items-center gap-2">
@@ -140,18 +140,15 @@ export default function BoutonConnexion() {
   async function inscrire(e) {
     e.preventDefault()
     setErreur('')
-    const pseudoPropre = pseudo.trim()
-    if (!pseudoPropre) { setErreur('Le pseudo est obligatoire.'); return }
+    const probleme = verifierInscription(pseudo, email, mdp)
+    if (probleme) { setErreur(probleme); return }
     setChargement(true)
-    const { data, error } = await supabase.auth.signUp({
-      email,
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
       password: mdp,
-      options: { emailRedirectTo: window.location.origin },
+      options: { data: { pseudo }, emailRedirectTo: window.location.origin },
     })
     if (error) { setChargement(false); setErreur(traduireErreurAuth(error.message)); return }
-    if (data?.user) {
-      await supabase.from('profiles').upsert({ id: data.user.id, pseudo: pseudoPropre })
-    }
     setChargement(false)
     setInscriptionReussie(true)
   }
@@ -207,6 +204,7 @@ export default function BoutonConnexion() {
                   <label className="block text-sm font-medium mb-1">Email</label>
                   <input
                     type="email"
+                    placeholder="nom@gmail.com"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     required
@@ -227,6 +225,7 @@ export default function BoutonConnexion() {
                   <div className="relative">
                     <input
                       type={mdpVisible ? 'text' : 'password'}
+                      placeholder="Votre mot de passe"
                       value={mdp}
                       onChange={e => setMdp(e.target.value)}
                       required
@@ -282,7 +281,7 @@ export default function BoutonConnexion() {
                       value={pseudo}
                       onChange={e => setPseudo(e.target.value)}
                       required
-                      placeholder="Votre nom d'affichage"
+                      placeholder="Ex. : data_analyst225"
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -290,6 +289,7 @@ export default function BoutonConnexion() {
                     <label className="block text-sm font-medium mb-1">Email</label>
                     <input
                       type="email"
+                      placeholder="nom@gmail.com"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       required
@@ -301,6 +301,7 @@ export default function BoutonConnexion() {
                     <div className="relative">
                       <input
                         type={mdpVisible ? 'text' : 'password'}
+                        placeholder="6 caractères minimum"
                         value={mdp}
                         onChange={e => setMdp(e.target.value)}
                         required
@@ -361,6 +362,7 @@ export default function BoutonConnexion() {
                     <label className="block text-sm font-medium mb-1">Email</label>
                     <input
                       type="email"
+                      placeholder="nom@gmail.com"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       required
