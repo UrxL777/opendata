@@ -314,7 +314,7 @@ export default function Detail() {
   async function telecharger(fichier) {
     const { data } = supabase.storage.from('jeux-donnees').getPublicUrl(fichier.chemin_stockage)
     window.open(data.publicUrl, '_blank')
-    await supabase.from('fichiers').update({ telechargements: (fichier.telechargements ?? 0) + 1 }).eq('id', fichier.id)
+    await supabase.rpc('compt_tel', { id_fichier: fichier.id })
   }
 
   if (chargement) return <p className="text-center py-16 text-gray-400">Chargement...</p>
