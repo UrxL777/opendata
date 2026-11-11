@@ -10,6 +10,16 @@ const TRADUCTIONS = [
   [/failed to fetch|network/i, 'Connexion impossible. Vérifiez votre accès à internet.'],
 ]
 
+const FORMAT_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+const FORMAT_PSEUDO = /^\S{3,20}$/
+
+export function verifierInscription(pseudo, email, mdp) {
+  if (!FORMAT_PSEUDO.test(pseudo)) return 'Le pseudo doit contenir entre 3 et 20 caractères, sans espace.'
+  if (!FORMAT_EMAIL.test(email.trim())) return 'Adresse email invalide. Exemple : nom@gmail.com'
+  if (mdp.length < 6) return 'Le mot de passe doit contenir au moins 6 caractères.'
+  return null
+}
+
 export function traduireErreurAuth(message = '') {
   const trouve = TRADUCTIONS.find(([motif]) => motif.test(message))
   return trouve ? trouve[1] : 'Une erreur est survenue. Veuillez réessayer.'

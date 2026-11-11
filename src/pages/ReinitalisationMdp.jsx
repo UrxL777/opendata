@@ -71,6 +71,7 @@ export default function ReinitalisationMdp() {
               <div className="relative">
                 <input
                   type={mdpVisible ? 'text' : 'password'}
+                  placeholder="6 caractères minimum"
                   value={mdp}
                   onChange={e => setMdp(e.target.value)}
                   required
@@ -90,6 +91,7 @@ export default function ReinitalisationMdp() {
               <div className="relative">
                 <input
                   type={confirmationVisible ? 'text' : 'password'}
+                  placeholder="Retapez le mot de passe"
                   value={confirmation}
                   onChange={e => setConfirmation(e.target.value)}
                   required
