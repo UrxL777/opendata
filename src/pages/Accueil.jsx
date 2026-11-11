@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { Search, Users, Database, Download } from 'lucide-react'
 import { supabase } from '../supabase'
 import { IconeCategorie } from '../utilitaires/iconeCategorie'
-import BoutonPublier from '../composants/BoutonPublier'
 
 const CATEGORIES_ACCUEIL = ['Économie', 'Santé', 'Éducation', 'Agriculture', 'Transport', 'Environnement', 'Démographie', 'Sport']
 
@@ -73,11 +72,10 @@ export default function Accueil() {
         <p className="text-gray-500 mb-8 max-w-2xl mx-auto">
           Publiez vos jeux de données, explorez ceux des autres et analysez-les avec l'aide d'une IA. Pensée pour les étudiants et les analystes qui construisent leur portfolio.
         </p>
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex justify-center">
           <Link to="/donnees" className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium">
             <Search size={18} /> Explorer les données
           </Link>
-          <BoutonPublier />
         </div>
         <p className="text-xs text-gray-400 mt-6 max-w-md mx-auto">
           Vous avez modifié un jeu de données déjà publié ? Redéposez simplement la nouvelle version : elle sera reconnue automatiquement.
