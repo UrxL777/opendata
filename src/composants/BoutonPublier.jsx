@@ -372,20 +372,25 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
   const [erreur, setErreur] = useState('')
 
   // Le code doit contenir une <iframe> avec une adresse https
-  function codeValide(code) {
-    const iframe = new DOMParser().parseFromString(code, 'text/html').querySelector('iframe')
-    return /^https:\/\//i.test(iframe?.getAttribute('src') ?? '')
+  function adresseIframe(code) {
+    return new DOMParser().parseFromString(code ?? '', 'text/html').querySelector('iframe')?.getAttribute('src')?.trim() ?? ''
   }
 
   async function publier(e) {
     e.preventDefault()
     if (!titre.trim()) { setErreur('Le titre est obligatoire.'); return }
-    if (!categorie) { setErreur('La catégorie est obligatoire.'); return }
     if (!codeEmbed.trim()) { setErreur('Le code d’intégration est obligatoire.'); return }
-    if (!codeValide(codeEmbed)) { setErreur('Code d’intégration invalide : il doit commencer par <iframe et contenir une adresse https://'); return }
+    const adresse = adresseIframe(codeEmbed)
+    if (!/^https:\/\//i.test(adresse)) { setErreur('Code d’intégration invalide : il doit commencer par <iframe et contenir une adresse https://'); return }
     setErreur('')
     setChargement(true)
     try {
+      const { data: existants } = await supabase.from('visualisations').select('titre, code_embed')
+      const doublon = existants?.find(v => adresseIframe(v.code_embed) === adresse)
+      if (doublon) {
+        setErreur(`Ce dashboard a déjà été publié sur la plateforme (« ${doublon.titre} »). Les doublons ne sont pas acceptés.`)
+        setChargement(false); return
+      }
       const { error: errInsert } = await supabase.from('visualisations').insert({ titre, description, categorie, code_embed: codeEmbed.trim(), utilisateur_id: utilisateur.id })
       if (errInsert) { setErreur(errInsert.message); setChargement(false); return }
       onPublie?.()
@@ -409,7 +414,7 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
           className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">Catégorie *</label>
+        <label className="block text-sm font-medium mb-1">Catégorie (facultatif)</label>
         <select value={categorie} onChange={e => setCategorie(e.target.value)}
           className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
           <option value="">-- Choisir --</option>
@@ -421,7 +426,7 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
         <textarea value={codeEmbed} onChange={e => setCodeEmbed(e.target.value)} rows={4}
           placeholder='<iframe src="https://..." ...></iframe>'
           className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" />
-        <p className="text-xs text-gray-400 mt-1">Collez le code d’intégration (iframe) fourni par Power BI, Tableau Public ou Looker Studio.</p>
+        <p className="text-xs text-gray-400 mt-1">Collez le code d’intégration (iframe) : Power BI, Tableau Public, Looker Studio, ou toute visualisation en ligne (Python, JavaScript…).</p>
         <details className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
           <summary className="cursor-pointer font-medium text-blue-600">Où trouver ce code ?</summary>
           <ul className="mt-2 space-y-1.5 list-disc pl-4">
