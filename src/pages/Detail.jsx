@@ -59,19 +59,19 @@ function RapportNettoyage({ jeuId }) {
   const { lignes_avant, lignes_apres, lignes_supprimees, nb_colonnes, operations } = rapport
 
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
-      <h2 className="font-semibold text-amber-800 mb-3">Rapport de nettoyage</h2>
+    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-6">
+      <h2 className="font-semibold text-blue-900 mb-3">Rapport de nettoyage</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-center">
         <div className="bg-white rounded-xl p-3">
           <p className="text-lg font-bold text-gray-800">{lignes_avant}</p>
           <p className="text-xs text-gray-400 mt-0.5">lignes au départ</p>
         </div>
         <div className="bg-white rounded-xl p-3">
-          <p className="text-lg font-bold text-green-700">{lignes_apres}</p>
+          <p className="text-lg font-bold text-blue-600">{lignes_apres}</p>
           <p className="text-xs text-gray-400 mt-0.5">lignes conservées</p>
         </div>
         <div className="bg-white rounded-xl p-3">
-          <p className="text-lg font-bold text-red-500">{lignes_supprimees}</p>
+          <p className="text-lg font-bold text-blue-900">{lignes_supprimees}</p>
           <p className="text-xs text-gray-400 mt-0.5">lignes supprimées</p>
         </div>
         {nb_colonnes != null && (
@@ -83,11 +83,11 @@ function RapportNettoyage({ jeuId }) {
       </div>
       {operations?.length > 0 && (
         <div>
-          <p className="text-sm font-medium text-amber-800 mb-2">Ce qui a été nettoyé :</p>
+          <p className="text-sm font-medium text-blue-900 mb-2">Ce qui a été nettoyé :</p>
           <ul className="space-y-1">
             {operations.map((op, i) => (
-              <li key={i} className="text-sm text-amber-700 flex gap-2">
-                <span className="text-amber-400 mt-0.5">•</span>
+              <li key={i} className="text-sm text-blue-700 flex gap-2">
+                <span className="text-blue-300 mt-0.5">•</span>
                 <span>{op}</span>
               </li>
             ))}

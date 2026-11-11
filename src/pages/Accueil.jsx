@@ -3,8 +3,16 @@ import { Link } from 'react-router-dom'
 import { Search, Users, Database, Download } from 'lucide-react'
 import { supabase } from '../supabase'
 import { IconeCategorie } from '../utilitaires/iconeCategorie'
+import BoutonPublier from '../composants/BoutonPublier'
 
 const CATEGORIES_ACCUEIL = ['Économie', 'Santé', 'Éducation', 'Agriculture', 'Transport', 'Environnement', 'Démographie', 'Sport']
+
+const ETAPES = [
+  { titre: 'Déposez votre fichier', texte: "CSV, Excel ou JSON, jusqu'à 50 Mo." },
+  { titre: "L'IA le décrit pour vous", texte: 'Titre, description et catégorie proposés automatiquement. Vous pouvez les modifier.' },
+  { titre: 'Rapport de qualité automatique', texte: 'Valeurs manquantes, doublons et nettoyage des données, détectés dès la publication.' },
+  { titre: 'Explorez avec Atlas', texte: "L'assistant qui vous guide dans l'analyse, avec du code Python si vous le souhaitez." },
+]
 
 export default function Accueil() {
   const [stats, setStats] = useState({ jeux: 0, utilisateurs: 0, telechargements: 0 })
@@ -59,20 +67,35 @@ export default function Accueil() {
     <div>
       <section className="bg-gradient-to-b from-blue-50 to-white py-20 px-4 text-center">
         <p className="text-blue-600 font-medium mb-3">Des données ouvertes et gratuites, partagées par tous</p>
-        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4">
-          Vous cherchez un jeu de données ?<br />Trouvez-le, ou partagez le vôtre.
+        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-4 max-w-4xl mx-auto">
+          La plateforme où les données se partagent et se comprennent
         </h1>
-        <p className="text-gray-500 mb-8 max-w-xl mx-auto">
-          Déposez, explorez et téléchargez gratuitement des jeux de données aux formats CSV, Excel et JSON.
+        <p className="text-gray-500 mb-8 max-w-2xl mx-auto">
+          Publiez vos jeux de données, explorez ceux des autres et analysez-les avec l'aide d'une IA. Pensée pour les étudiants et les analystes qui construisent leur portfolio.
         </p>
-        <div className="flex justify-center">
+        <div className="flex flex-wrap justify-center gap-3">
           <Link to="/donnees" className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium">
             <Search size={18} /> Explorer les données
           </Link>
+          <BoutonPublier />
         </div>
         <p className="text-xs text-gray-400 mt-6 max-w-md mx-auto">
           Vous avez modifié un jeu de données déjà publié ? Redéposez simplement la nouvelle version : elle sera reconnue automatiquement.
         </p>
+      </section>
+
+      <section className="py-16 px-4 bg-white text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Comment ça marche ?</h2>
+        <p className="text-gray-500 mb-10">De votre fichier brut à un jeu de données prêt à être analysé, en quelques secondes</p>
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-left">
+          {ETAPES.map((etape, i) => (
+            <div key={etape.titre} className="border border-blue-100 rounded-2xl p-6">
+              <div className="w-11 h-11 rounded-full bg-blue-50 text-blue-600 font-bold text-lg flex items-center justify-center mb-4">{i + 1}</div>
+              <h3 className="font-semibold text-blue-900 mb-2">{etape.titre}</h3>
+              <p className="text-sm text-gray-500">{etape.texte}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="py-16 px-4 bg-white text-center">
