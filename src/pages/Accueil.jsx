@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Users, Database, Download } from 'lucide-react'
+import { Search, Users, Database, Download, ChartColumnBig } from 'lucide-react'
 import { supabase } from '../supabase'
 import { IconeCategorie } from '../utilitaires/iconeCategorie'
 
@@ -14,7 +14,7 @@ const ETAPES = [
 ]
 
 export default function Accueil() {
-  const [stats, setStats] = useState({ jeux: 0, utilisateurs: 0, telechargements: 0 })
+  const [stats, setStats] = useState({ jeux: 0, utilisateurs: 0, telechargements: 0, dashboards: 0 })
   const [categories, setCategories] = useState([])
 
   useEffect(() => {
@@ -26,6 +26,10 @@ export default function Accueil() {
 
       const { count: utilisateurs } = await supabase
         .from('profiles')
+        .select('*', { count: 'exact', head: true })
+
+      const { count: dashboards } = await supabase
+        .from('visualisations')
         .select('*', { count: 'exact', head: true })
 
       const { data: fichiers } = await supabase
@@ -53,7 +57,7 @@ export default function Accueil() {
         .filter(c => CATEGORIES_ACCUEIL.includes(c.nom))
         .sort((a,b) => CATEGORIES_ACCUEIL.indexOf(a.nom) - CATEGORIES_ACCUEIL.indexOf(b.nom))
 
-      setStats({ jeux: jeux ?? 0, utilisateurs: utilisateurs ?? 0, telechargements })
+      setStats({ jeux: jeux ?? 0, utilisateurs: utilisateurs ?? 0, telechargements, dashboards: dashboards ?? 0 })
       setCategories(catsAvecCompte)
     }
     charger()
@@ -99,11 +103,16 @@ export default function Accueil() {
       <section className="py-16 px-4 bg-white text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Un écosystème de données en construction</h2>
         <p className="text-gray-500 mb-10">Découvrez les statistiques de notre portail communautaire</p>
-        <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="border border-gray-100 rounded-2xl p-6 shadow-sm">
             <div className="flex justify-center mb-2 text-blue-600"><Database size={28} /></div>
             <p className="text-3xl font-bold text-blue-600">{stats.jeux}</p>
             <p className="text-gray-500 text-sm mt-1">Jeux de données</p>
+          </div>
+          <div className="border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <div className="flex justify-center mb-2 text-blue-600"><ChartColumnBig size={28} /></div>
+            <p className="text-3xl font-bold text-blue-600">{stats.dashboards}</p>
+            <p className="text-gray-500 text-sm mt-1">Dashboards</p>
           </div>
           <div className="border border-gray-100 rounded-2xl p-6 shadow-sm">
             <div className="flex justify-center mb-2 text-blue-600"><Download size={28} /></div>
