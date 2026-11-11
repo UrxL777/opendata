@@ -140,11 +140,17 @@ export default function BoutonConnexion() {
   async function inscrire(e) {
     e.preventDefault()
     setErreur('')
+    const pseudoPropre = pseudo.trim()
+    if (!pseudoPropre) { setErreur('Le pseudo est obligatoire.'); return }
     setChargement(true)
-    const { data, error } = await supabase.auth.signUp({ email, password: mdp })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: mdp,
+      options: { emailRedirectTo: window.location.origin },
+    })
     if (error) { setChargement(false); setErreur(traduireErreurAuth(error.message)); return }
     if (data?.user) {
-      await supabase.from('profiles').upsert({ id: data.user.id, pseudo })
+      await supabase.from('profiles').upsert({ id: data.user.id, pseudo: pseudoPropre })
     }
     setChargement(false)
     setInscriptionReussie(true)
