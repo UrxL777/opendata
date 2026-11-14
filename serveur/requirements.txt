@@ -11,3 +11,5 @@ numpy
 chardet
 openai
 python-dateutil
+duckdb>=1.1
+pyarrow>=15
