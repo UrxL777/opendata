@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Database, ChartColumnBig, Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
+import { Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuthentification } from '../contexte/Authentification'
 import { traduireErreurAuth, verifierInscription } from '../utilitaires/erreursAuth'
@@ -360,97 +360,12 @@ function FormulaireDataset({ onFermer }) {
   )
 }
 
-// ─── Formulaire visualisation ─────────────────────────────────────────────────
-
-function FormulaireVisualisation({ onFermer, onPublie }) {
-  const { utilisateur } = useAuthentification()
-  const [titre, setTitre] = useState('')
-  const [description, setDescription] = useState('')
-  const [categorie, setCategorie] = useState('')
-  const [codeEmbed, setCodeEmbed] = useState('')
-  const [chargement, setChargement] = useState(false)
-  const [erreur, setErreur] = useState('')
-
-  // Le code doit contenir une <iframe> avec une adresse https
-  function adresseIframe(code) {
-    return new DOMParser().parseFromString(code ?? '', 'text/html').querySelector('iframe')?.getAttribute('src')?.trim() ?? ''
-  }
-
-  async function publier(e) {
-    e.preventDefault()
-    if (!titre.trim()) { setErreur('Le titre est obligatoire.'); return }
-    if (!codeEmbed.trim()) { setErreur('Le code d’intégration est obligatoire.'); return }
-    const adresse = adresseIframe(codeEmbed)
-    if (!/^https:\/\//i.test(adresse)) { setErreur('Code d’intégration invalide : il doit commencer par <iframe et contenir une adresse https://'); return }
-    setErreur('')
-    setChargement(true)
-    try {
-      const { data: existants } = await supabase.from('visualisations').select('titre, code_embed')
-      const doublon = existants?.find(v => adresseIframe(v.code_embed) === adresse)
-      if (doublon) {
-        setErreur(`Ce dashboard a déjà été publié sur la plateforme (« ${doublon.titre} »). Les doublons ne sont pas acceptés.`)
-        setChargement(false); return
-      }
-      const { error: errInsert } = await supabase.from('visualisations').insert({ titre, description, categorie, code_embed: codeEmbed.trim(), utilisateur_id: utilisateur.id })
-      if (errInsert) { setErreur(errInsert.message); setChargement(false); return }
-      onPublie?.()
-      onFermer()
-    } catch {
-      setErreur('Une erreur est survenue.')
-      setChargement(false)
-    }
-  }
-
-  return (
-    <form onSubmit={publier} className="p-5 space-y-4">
-      <div>
-        <label className="block text-sm font-medium mb-1">Titre *</label>
-        <input value={titre} onChange={e => setTitre(e.target.value)}
-          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Description</label>
-        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
-          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Catégorie (facultatif)</label>
-        <select value={categorie} onChange={e => setCategorie(e.target.value)}
-          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus bg-fond">
-          <option value="">-- Choisir --</option>
-          {['Économie','Santé','Éducation','Agriculture','Transport','Environnement','Démographie','Sport','Culture','Sécurité & Justice'].map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Code d’intégration *</label>
-        <textarea value={codeEmbed} onChange={e => setCodeEmbed(e.target.value)} rows={4}
-          placeholder='<iframe src="https://..." ...></iframe>'
-          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-bordure-focus" />
-        <p className="text-xs text-texte-discret mt-1">Collez le code d’intégration (iframe) : Power BI, Tableau Public, Looker Studio, ou toute visualisation en ligne (Python, JavaScript…).</p>
-        <details className="mt-2 text-xs text-texte-secondaire bg-fond-doux border border-bordure rounded-lg px-3 py-2">
-          <summary className="cursor-pointer font-medium text-principal">Où trouver ce code ?</summary>
-          <ul className="mt-2 space-y-1.5 list-disc pl-4">
-            <li><strong>Power BI</strong> : Fichier → Incorporer le rapport → Publier sur le web → copier le code &lt;iframe&gt;</li>
-            <li><strong>Looker Studio</strong> : Partager → Intégrer le rapport → copier le code d’intégration</li>
-            <li><strong>Tableau Public</strong> : bouton Partager sous le dashboard → copier le code d’intégration</li>
-          </ul>
-        </details>
-      </div>
-      {erreur && <p className="text-texte-erreur text-sm">{erreur}</p>}
-      <button type="submit" disabled={chargement}
-        className="w-full bg-principal hover:bg-principal-survol disabled:opacity-50 text-texte-inverse py-3 rounded-lg font-medium text-sm">
-        {chargement ? 'Publication...' : 'Publier'}
-      </button>
-    </form>
-  )
-}
-
 // ─── Modal principal ──────────────────────────────────────────────────────────
 
-export default function BoutonPublier({ onVisualisationPubliee }) {
+export default function BoutonPublier() {
   const { utilisateur } = useAuthentification()
   const [ouvert, setOuvert] = useState(false)
-  const [etape, setEtape] = useState('choix')
+  const [etape, setEtape] = useState('dataset')
 
   const [vueConnexion, setVueConnexion] = useState('connexion')
   const [emailCo, setEmailCo] = useState('')
@@ -473,14 +388,14 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
       setMdpVisible(false)
       setInscriptionReussie(false)
     } else {
-      setEtape('choix')
+      setEtape('dataset')
     }
     setOuvert(true)
   }
 
   function fermer() {
     setOuvert(false)
-    setEtape('choix')
+    setEtape('dataset')
   }
 
   function changerVueCo(v) {
@@ -500,7 +415,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
     const { error } = await supabase.auth.signInWithPassword({ email: emailCo, password: mdpCo })
     setChargementCo(false)
     if (error) { setErreurCo(traduireErreurAuth(error.message)); return }
-    setEtape('choix')
+    setEtape('dataset')
   }
 
   async function reinitialiserDepuisPublier(e) {
@@ -545,14 +460,8 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
             onClick={e => e.stopPropagation()}>
 
             <div className="flex items-center justify-between p-5 border-b border-bordure-legere">
-              {etape !== 'choix' && etape !== 'non_connecte' && (
-                <button onClick={() => setEtape('choix')} className="text-sm text-texte-discret hover:text-texte-secondaire mr-3">
-                  ← Retour
-                </button>
-              )}
               <div>
                 <h2 className="font-bold text-lg">Publier sur OpenData</h2>
-                {etape === 'choix' && <p className="text-sm text-texte-discret">Que souhaitez-vous publier ?</p>}
               </div>
               <button onClick={fermer} className="text-texte-discret hover:text-texte-secondaire ml-auto">
                 <X size={20} />
@@ -680,34 +589,7 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
               </div>
             )}
 
-            {etape === 'choix' && (
-              <div className="p-5 grid grid-cols-2 gap-4">
-                <button onClick={() => setEtape('dataset')}
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-bordure hover:border-bordure-bleu-doux hover:bg-fond-bleu-clair transition-colors text-center">
-                  <div className="w-12 h-12 rounded-full bg-fond-bleu-pale flex items-center justify-center">
-                    <Database size={22} className="text-principal" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">Jeu de données</p>
-                    <p className="text-xs text-texte-discret mt-0.5">Publier un fichier CSV, Excel, JSON</p>
-                  </div>
-                </button>
-
-                <button onClick={() => setEtape('visualisation')}
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-bordure hover:border-bordure-bleu-doux hover:bg-fond-bleu-clair transition-colors text-center">
-                  <div className="w-12 h-12 rounded-full bg-bleu-nuit flex items-center justify-center">
-                    <ChartColumnBig size={22} className="text-texte-inverse" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">Dashboard</p>
-                    <p className="text-xs text-texte-discret mt-0.5">Partager un dashboard interactif (Power BI, Tableau, Looker Studio…)</p>
-                  </div>
-                </button>
-              </div>
-            )}
-
             {etape === 'dataset' && <FormulaireDataset onFermer={fermer} />}
-            {etape === 'visualisation' && <FormulaireVisualisation onFermer={fermer} onPublie={onVisualisationPubliee} />}
           </div>
         </div>
       )}

@@ -96,7 +96,7 @@ export default function Navigation() {
               Dashboards
             </Link>
             <div className="pt-3 pb-2">
-              <BoutonPublier onVisualisationPubliee={fermerMenu} />
+              <BoutonPublier />
             </div>
           </nav>
         </div>
