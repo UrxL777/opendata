@@ -580,9 +580,10 @@ Tu reçois les résultats RÉELS de tes calculs (colonnes et lignes). Pour chacu
   - "phrase" : une ou deux phrases de conclusion avec les vrais chiffres du résultat. Pas de cause affirmée (écris « sont plus élevés chez », jamais « causent »). Ne compare jamais en citant un groupe dont nb est inférieur à 30 sans préciser entre parenthèses qu'il ne compte que ce petit nombre de lignes.
 - "conclusion" : 2 à 3 phrases qui répondent à la question centrale, comme un analyste qui présente son dashboard à un décideur.
 - "ordre" : la liste des id des graphiques dans l'ordre d'affichage (du général au détail).
+- "libelles_filtres" : pour chaque filtre reçu, un nom court et lisible en français à afficher sur le bouton (ex. {"smoker": "Fumeur", "categorie_age": "Tranche d'âge"}). La clé est le nom EXACT de la colonne du filtre.
 
 Réponds avec ce JSON :
-{"kpi": [...], "graphiques": [...], "conclusion": "...", "ordre": ["g1", "..."]}"""
+{"kpi": [...], "graphiques": [...], "conclusion": "...", "ordre": ["g1", "..."], "libelles_filtres": {"colonne": "Nom lisible"}}"""
 
 
 def _attente_limite(erreur: Exception) -> float | None:
@@ -879,6 +880,10 @@ def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement:
     if not graphiques:
         raise ValueError("Aucun graphique valide n'a pu être construit.")
 
+    # Nom lisible de chaque filtre, donné par Atlas ; à défaut, le nom de la colonne
+    libelles = presentation.get("libelles_filtres") if isinstance(presentation.get("libelles_filtres"), dict) else {}
+    filtres = [{**f, "libelle": str(libelles.get(f["colonne"]) or f["colonne"]).strip()[:40]} for f in filtres]
+
     return {
         "version": 1,
         "comprehension": comprehension,
@@ -1000,6 +1005,8 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
             "kpi": [{"id": cid, "titre": c["titre"], "resultat": c["resultat"]} for cid, c in kpi_calcules.items()],
             "graphiques": [{"id": cid, "question": c["question"], "famille": c["famille"], "resultat": c["resultat"]}
                            for cid, c in graphiques_calcules.items()],
+            "filtres": [{"colonne": f["colonne"], "exemples_de_valeurs": [v["valeur"] for v in f["valeurs"][:5]]}
+                        for f in filtres],
         }, ensure_ascii=False)},
     ], "étape 3 (présenter)")
 
