@@ -85,7 +85,7 @@ def _valeur_json(v):
     return v
 
 
-NOM_VALIDE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+NOM_VALIDE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,39}$")
 
 
 def verifier_colonne_calculee(colonne: dict, noms_existants: list) -> str | None:
@@ -97,7 +97,7 @@ def verifier_colonne_calculee(colonne: dict, noms_existants: list) -> str | None
     nom = str(colonne.get("nom", ""))
     expression = str(colonne.get("expression", "")).strip()
     if not NOM_VALIDE.match(nom):
-        return f"Nom de colonne calculée invalide : « {nom} » (minuscules, chiffres et _ uniquement)."
+        return f"Nom de colonne calculée invalide : « {nom} » (lettres sans accent, chiffres et _ uniquement)."
     if nom in noms_existants:
         return f"La colonne « {nom} » existe déjà."
     if not expression:

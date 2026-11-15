@@ -307,6 +307,27 @@ def effectif_minimum(nb_lignes: int) -> int:
     """Taille minimale d'un groupe fiable : 30, ou moins pour un petit fichier (un dixième des lignes, au moins 2)."""
     return min(EFFECTIF_MIN, max(2, nb_lignes // 10))
 SEUIL_IMPORTANCE = 0.15 # un facteur est important si son écart vaut au moins 15 % de celui du premier
+MAX_TOKENS_REPONSE = 3500  # tokens réservés pour chaque réponse (l'offre gratuite de Groq limite à 8 000 par minute)
+
+
+def fiche_compacte(fiche: dict, avec_exemples: bool = True) -> dict:
+    """Version allégée de la fiche, pour rester sous la limite de tokens de Groq même avec beaucoup de colonnes."""
+    colonnes = []
+    for c in fiche["colonnes"]:
+        petite = {k: v for k, v in c.items() if k not in ("valeurs_frequentes", "exemples", "ecart_type")}
+        if c.get("valeurs_frequentes"):
+            petite["valeurs_frequentes"] = c["valeurs_frequentes"][:6]
+        if c.get("exemples") and avec_exemples:
+            petite["exemples"] = [str(e)[:40] for e in c["exemples"][:2]]
+        colonnes.append(petite)
+    compacte = {k: fiche[k] for k in ("titre", "description", "nb_lignes", "nb_colonnes", "table_sql") if k in fiche}
+    compacte["colonnes"] = colonnes
+    if avec_exemples:
+        compacte["lignes_exemple"] = [
+            {k: (str(v)[:40] if isinstance(v, str) else v) for k, v in ligne.items()}
+            for ligne in fiche.get("lignes_exemple", [])[:5]
+        ]
+    return compacte
 TYPES_GRAPHIQUES = {"barres", "barres_horizontales", "barres_groupees", "courbe", "camembert"}
 
 PROMPT_ANALYSTE_ROLE = """Tu es l'Analyste de la plateforme OpenData : un data analyst expérimenté qui construit automatiquement un dashboard pour chaque jeu de données publié.
@@ -331,9 +352,9 @@ PROMPT_COMPRENDRE = PROMPT_ANALYSTE_ROLE + """
    - Une colonne catégorielle qui a des groupes rares (moins de 30 lignes : regarde les pourcentages de la fiche et le nombre de lignes) est regroupée (ex. enfants : 0, 1, 2, « 3 et plus » ; ou « Autres » pour les valeurs rares).
    - Une colonne date peut donner une colonne de période : strftime("date", '%Y-%m') pour le mois, ou CAST(year("date") AS VARCHAR) pour l'année.
    - Format : {"nom": "categorie_imc", "expression": "CASE WHEN \\"bmi\\" < 18.5 THEN '1. Sous-poids' WHEN \\"bmi\\" < 25 THEN '2. Poids normal' WHEN \\"bmi\\" < 30 THEN '3. Surpoids' ELSE '4. Obésité' END", "explication": "Catégories d'IMC selon l'OMS"}
-   - "nom" : minuscules, chiffres et _ uniquement, différent des colonnes existantes. "expression" : une formule SQL DuckDB (CASE WHEN, strftime, year…), sans SELECT ni FROM. Les noms de colonnes entre guillemets doubles.
+   - "nom" : lettres sans accent, chiffres et _ uniquement (ex. categorie_age), différent des colonnes existantes. "expression" : une formule SQL DuckDB (CASE WHEN, strftime, year…), sans SELECT ni FROM. Les noms de colonnes entre guillemets doubles.
    - Les libellés des tranches doivent se trier dans le bon ordre (ex. '18-25', '26-40' ou '1. Sous-poids', '2. Poids normal').
-7. "facteurs" : la liste des colonnes qui peuvent expliquer la colonne principale (colonnes catégorielles existantes ou colonnes calculées). Chaque facteur a entre 2 et 15 groupes. N'y mets pas les identifiants, le texte libre, ni la colonne principale, ni une colonne calculée à partir de la colonne principale (une colonne ne s'explique pas par elle-même). Pour une colonne quantitative, mets sa version en tranches.
+7. "facteurs" : la liste des colonnes qui peuvent expliquer la colonne principale (colonnes catégorielles existantes ou colonnes calculées). Chaque facteur a entre 2 et 15 groupes. N'y mets pas les identifiants, le texte libre, les coordonnées géographiques (latitude, longitude), ni la colonne principale, ni une colonne calculée à partir de la colonne principale (une colonne ne s'explique pas par elle-même). Pour une colonne quantitative, mets sa version en tranches. Ne mets jamais à la fois une colonne et sa version calculée : choisis la plus lisible.
 
 Réponds avec ce JSON :
 {"sujet": "...", "une_ligne_represente": "...", "colonne_principale": "...", "valeur_cible": null, "question_centrale": "...", "colonnes_calculees": [...], "facteurs": ["...", "..."]}"""
@@ -400,9 +421,10 @@ def _attente_limite(erreur: Exception) -> float | None:
     message = str(erreur)
     if "429" not in message and "rate limit" not in message.lower():
         return None
-    delai = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", message)
-    secondes = (int(delai.group(1) or 0) * 60 + float(delai.group(2))) if delai else 20.0
-    return min(secondes + 1, 90)
+    delai = re.search(r"try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s", message)
+    if not delai:
+        return 20.0
+    return int(delai.group(1) or 0) * 3600 + int(delai.group(2) or 0) * 60 + float(delai.group(3)) + 1
 
 
 def _appeler_analyste(messages: list[dict], etape: str) -> dict:
@@ -418,10 +440,13 @@ def _appeler_analyste(messages: list[dict], etape: str) -> dict:
             reponse = client.chat.completions.create(
                 model=MODELE,
                 messages=messages_envoyes,
-                max_tokens=8000,
+                max_tokens=MAX_TOKENS_REPONSE,
                 temperature=0.2,
                 response_format={"type": "json_object"},
             )
+            if getattr(reponse, "usage", None):
+                print(f"[ANALYSTE] Tokens ({etape}) : {reponse.usage.prompt_tokens} envoyés + "
+                      f"{reponse.usage.completion_tokens} reçus = {reponse.usage.total_tokens}")
             contenu = (reponse.choices[0].message.content or "").strip()
             correspondance = re.search(r"\{.*\}", contenu, re.DOTALL)
             if not correspondance:
@@ -431,11 +456,14 @@ def _appeler_analyste(messages: list[dict], etape: str) -> dict:
             return resultat
         except Exception as e:
             attente = _attente_limite(e)
+            if attente is not None and attente > 120:
+                # Quota du jour épuisé : inutile d'attendre, la relance automatique refera l'analyse plus tard
+                raise RuntimeError(f"Quota de Groq épuisé ({etape}) : nouvel essai possible plus tard.") from e
             if attente is not None and attentes < 6:
                 # Limite de Groq atteinte : on patiente, sans compter cet essai comme un échec
                 attentes += 1
                 print(f"[ANALYSTE] Limite de Groq atteinte ({etape}) : attente de {attente:.0f} s")
-                time.sleep(attente)
+                time.sleep(min(attente, 90))
                 continue
             print(f"[ANALYSTE] ✗ {etape}, essai {essai + 1} : {str(e)[:300]}")
             essai += 1
@@ -629,7 +657,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
     """
     print(f"\n[ANALYSTE] ── Début de l'analyse : {fiche.get('titre') or '(sans titre)'}")
     roles = {c["nom"]: c["role"] for c in fiche["colonnes"]}
-    fiche_json = json.dumps(fiche, ensure_ascii=False)
+    fiche_json = json.dumps(fiche_compacte(fiche), ensure_ascii=False)
 
     # Étape 1 : comprendre
     comprehension = _appeler_analyste([
@@ -661,7 +689,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
         {"role": "system", "content": PROMPT_QUESTIONNER},
         {"role": "user", "content": json.dumps({
             "comprehension": comprehension, "colonnes_calculees": colonnes_calculees,
-            "classement_facteurs": classement, "fiche": fiche,
+            "classement_facteurs": classement, "fiche": fiche_compacte(fiche, avec_exemples=False),
         }, ensure_ascii=False)},
     ]
     plan = _appeler_analyste(messages, "étape 2 (questionner)")
@@ -681,8 +709,11 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
         erreurs = {}
         for cid in a_executer:
             res = executer_requete(chemin_propre, calculs[cid]["sql"], None, colonnes_calculees)
-            if res["ok"] and res["lignes"]:
+            if res["ok"] and res["lignes"] and not res["tronque"]:
                 calculs[cid]["resultat"] = res
+            elif res["ok"] and res["tronque"]:
+                erreurs[cid] = (f"Le résultat dépasse {len(res['lignes'])} lignes et a été coupé : regroupe davantage "
+                                "(par année au lieu de par mois, ou les principaux groupes seulement).")
             else:
                 erreurs[cid] = res.get("erreur") or "Le résultat est vide."
         print(f"[ANALYSTE] Exécution {essai + 1} : {len(a_executer) - len(erreurs)} réussie(s), {len(erreurs)} erreur(s)")
