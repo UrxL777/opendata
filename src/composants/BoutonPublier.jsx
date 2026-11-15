@@ -5,6 +5,9 @@ import { useAuthentification } from '../contexte/Authentification'
 import { traduireErreurAuth, verifierInscription } from '../utilitaires/erreursAuth'
 import { useNavigate } from 'react-router-dom'
 
+// Moment de la publication (en millisecondes), pour donner un nom unique au fichier stocké
+const horodatage = () => Date.now()
+
 function IcôneOeil({ visible }) {
   if (visible) {
     return (
@@ -111,8 +114,14 @@ function FormulaireDataset({ onFermer }) {
       if (!rep.ok) return
       const s = await rep.json()
       suggestionRef.current = { titre: s.titre || '', description: s.description || '', categorieId: s.categorie_id ? String(s.categorie_id) : '' }
-      // On ne remplace pas les informations du jeu existant si l'utilisateur a choisi de le mettre à jour
-      if (choixRef.current !== 'maj') appliquerValeurs(suggestionRef.current)
+      // On ne remplace pas les informations du jeu existant si l'utilisateur a choisi de le mettre à jour.
+      // La suggestion ne remplit que les champs encore vides : ce que l'utilisateur a déjà tapé est gardé.
+      if (choixRef.current !== 'maj') {
+        const s = suggestionRef.current
+        setTitre(actuel => actuel.trim() ? actuel : s.titre)
+        setDescription(actuel => actuel.trim() ? actuel : s.description)
+        setCategorieId(actuel => actuel || s.categorieId)
+      }
     })().catch(() => {}).finally(() => {
       if (controleurRef.current === controleur) setAnalyse(false)
     })
@@ -185,7 +194,7 @@ function FormulaireDataset({ onFermer }) {
       const hash_fichier = comparaison?.hash_fichier ?? null
       const jeuAMettreAJour = choixRequis && choix === 'maj' ? comparaison.jeu : null
 
-      const cheminFichier = `${utilisateur.id}/${Date.now()}_${nomFichier}`
+      const cheminFichier = `${utilisateur.id}/${horodatage()}_${nomFichier}`
       const { error: erreurUpload } = await supabase.storage.from('jeux-donnees').upload(cheminFichier, fichier)
       if (erreurUpload) { setErreur(erreurUpload.message); setChargement(false); return }
 
