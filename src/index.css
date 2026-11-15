@@ -76,3 +76,9 @@
   --color-graphique-petit-groupe: oklch(93.2% 0.032 255.585); /* #dbeafe : barre pâle : groupe de moins de 30 lignes */
   --color-graphique-grille: oklch(96.7% 0.003 264.542); /* #f3f4f6 : lignes de fond des graphiques */
 }
+
+/* Graphiques : pas de cadre noir autour d'une barre après un clic */
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible {
+  outline: none;
+}

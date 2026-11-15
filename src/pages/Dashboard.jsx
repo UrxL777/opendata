@@ -204,7 +204,7 @@ export default function Dashboard() {
             <div className={`grid grid-cols-1 gap-4 ${atlasOuvert && !estMobile ? '2xl:grid-cols-2' : 'lg:grid-cols-2'}`}>
               {(contenu.graphiques ?? []).map((g, i) => (
                 <GraphiqueDashboard key={g.id} graphique={g} resultat={resultatDe(g)} numero={i + 1} effectifMin={effectifMin}
-                  colonnesFiltres={filtres.map(f => f.colonne)} onCliquerValeur={cliquerValeur} compact={estMobile} />
+                  filtres={filtres} onCliquerValeur={cliquerValeur} compact={estMobile} />
               ))}
             </div>
           </div>
@@ -242,7 +242,7 @@ export default function Dashboard() {
                 <X size={18} className="text-texte-doux" />
               </button>
             </div>
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
               <PanneauChat jeuId={id} estMobile={true} afficherHeader={false} />
             </div>
           </div>

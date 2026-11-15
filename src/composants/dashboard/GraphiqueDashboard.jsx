@@ -23,6 +23,55 @@ const raccourcir = (texte, max) => {
   return t.length > max ? t.slice(0, max - 1) + '…' : t
 }
 
+// Coupe un nom en lignes d'environ « max » caractères, aux espaces : le nom est affiché EN ENTIER
+function couperEnLignes(texte, max) {
+  const lignes = []
+  for (const mot of String(texte ?? '').split(' ')) {
+    const derniere = lignes[lignes.length - 1]
+    if (derniere !== undefined && (derniere + ' ' + mot).length <= max) lignes[lignes.length - 1] = derniere + ' ' + mot
+    else lignes.push(mot)
+  }
+  return lignes
+}
+
+// Graduation sous l'axe horizontal : le nom sur plusieurs lignes, centré sous la barre
+function GraduationBas({ x, y, payload, max }) {
+  const lignes = couperEnLignes(payload.value, max)
+  return (
+    <text x={x} y={y + 12} textAnchor="middle" fontSize={12} fill={COULEUR_TEXTE_AXE}>
+      {lignes.map((l, i) => <tspan key={i} x={x} dy={i === 0 ? 0 : 14}>{l}</tspan>)}
+    </text>
+  )
+}
+
+// Graduation à gauche (barres horizontales) : le nom sur plusieurs lignes, centré sur la barre
+function GraduationGauche({ x, y, payload, max }) {
+  const lignes = couperEnLignes(payload.value, max)
+  return (
+    <text x={x - 6} y={y - ((lignes.length - 1) * 14) / 2 + 4} textAnchor="end" fontSize={12} fill={COULEUR_TEXTE_AXE}>
+      {lignes.map((l, i) => <tspan key={i} x={x - 6} dy={i === 0 ? 0 : 14}>{l}</tspan>)}
+    </text>
+  )
+}
+
+// Quel filtre correspond aux catégories d'un graphique ? On compare les VALEURS (pas le nom de la colonne,
+// qu'Atlas a pu renommer dans son calcul) : les barres « Jet Airways, IndiGo… » sont les valeurs du filtre « Compagnie ».
+function filtreDuGraphique(filtres, valeursX, nomX) {
+  const valeurs = valeursX.filter(v => v != null).map(String)
+  if (valeurs.length < 2) return null
+  let meilleur = null
+  for (const f of filtres ?? []) {
+    const connues = new Set(f.valeurs.map(v => String(v.valeur)))
+    const trouvees = valeurs.filter(v => connues.has(v)).length
+    const inconnues = valeurs.filter(v => !connues.has(v))
+    // Toutes les barres doivent être des valeurs du filtre (sauf un éventuel regroupement « Autres »)
+    if (trouvees < 2 || inconnues.some(v => !/^autres?$/i.test(v.trim()))) continue
+    const score = (f.colonne === nomX ? 1000 : 0) + trouvees - connues.size / 1000
+    if (!meilleur || score > meilleur.score) meilleur = { score, filtre: f, connues }
+  }
+  return meilleur
+}
+
 // Transforme le résultat SQL (colonnes + lignes) en données pour Recharts
 function preparerDonnees(graphique, resultat) {
   const { colonnes = [], lignes = [] } = resultat ?? {}
@@ -74,13 +123,29 @@ function Bulle({ active, payload, label, graphique, effectifMin }) {
   )
 }
 
-export default function GraphiqueDashboard({ graphique, resultat, numero, effectifMin = 30, colonnesFiltres = [], onCliquerValeur, compact = false }) {
+export default function GraphiqueDashboard({ graphique, resultat, numero, effectifMin = 30, filtres = [], onCliquerValeur, compact = false }) {
   const { donnees, series } = preparerDonnees(graphique, resultat)
-  // Sur un petit écran, des barres avec beaucoup de catégories deviennent horizontales (noms lisibles à gauche)
-  const type = compact && graphique.type === 'barres' && donnees.length > 5 ? 'barres_horizontales' : graphique.type
+  const plusLongNom = Math.max(0, ...donnees.map(d => String(d.x).length))
+  // Des barres avec beaucoup de catégories ou des noms longs deviennent horizontales : les noms ont la place à gauche
+  const type = graphique.type === 'barres' && (donnees.length > (compact ? 5 : 8) || plusLongNom > (compact ? 10 : 16))
+    ? 'barres_horizontales' : graphique.type
   const petit = nb => nb != null && nb < effectifMin
-  const cliquable = colonnesFiltres.includes(graphique.x) && onCliquerValeur
-  const cliquer = d => { if (cliquable && d?.x != null) onCliquerValeur(graphique.x, d.x) }
+
+  // Clic sur une barre = filtrer par cette valeur (si les barres sont les valeurs d'un filtre)
+  const lien = onCliquerValeur ? filtreDuGraphique(filtres, donnees.map(d => d.x), graphique.x) : null
+  const cliquable = !!lien
+  // Recharts donne la barre cliquée : son nom est dans payload (d.x est sa position en pixels)
+  const cliquer = d => {
+    const valeur = d?.payload?.x
+    if (lien && valeur != null && lien.connues.has(String(valeur))) onCliquerValeur(lien.filtre.colonne, String(valeur))
+  }
+
+  // Place pour les noms écrits sur plusieurs lignes
+  const maxGauche = compact ? 13 : 20
+  const lignesGauche = Math.max(1, ...donnees.map(d => couperEnLignes(d.x, maxGauche).length))
+  const largeurGauche = Math.min(compact ? 100 : 150, 14 + 7 * Math.max(...donnees.map(d => Math.max(...couperEnLignes(d.x, maxGauche).map(l => l.length))), 4))
+  const maxBas = Math.max(6, Math.floor((compact ? 300 : 520) / Math.max(1, donnees.length) / 7))
+  const lignesBas = Math.max(1, ...donnees.map(d => couperEnLignes(d.x, maxBas).length))
 
   // Base du graphique : nombre de lignes utilisées (sauf croisement : chaque ligne compte une fois par série)
   const total = graphique.effectif && donnees.length
@@ -94,8 +159,9 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
   const bulle = <Tooltip content={<Bulle graphique={graphique} effectifMin={effectifMin} />} cursor={{ fill: 'var(--color-fond-bleu-clair)' }} />
   const axeTexte = { fontSize: 12, fill: COULEUR_TEXTE_AXE }
   const labelY = { value: graphique.libelle_y, angle: -90, position: 'insideLeft', style: { ...axeTexte, textAnchor: 'middle' } }
-  const labelX = { value: graphique.libelle_x, position: 'insideBottom', offset: -12, style: axeTexte }
-  const marges = { top: 8, right: 12, bottom: 28, left: 8 }
+  const labelX = { value: graphique.libelle_x, position: 'insideBottom', offset: -18, style: axeTexte }
+  const marges = { top: 8, right: 12, bottom: 34, left: 8 }
+  const hauteurAxeBas = 22 + (lignesBas - 1) * 14
 
   let rendu
   if (!donnees.length) {
@@ -132,7 +198,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
       <BarChart data={donnees} layout="vertical" margin={{ ...marges, left: 4 }}>
         <CartesianGrid stroke={COULEUR_GRILLE} horizontal={false} />
         <XAxis type="number" tick={axeTexte} tickFormatter={formaterAxe} label={{ ...labelX, value: graphique.libelle_y }} />
-        <YAxis type="category" dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(v, compact ? 12 : 16)} width={compact ? 92 : 120} interval={0} />
+        <YAxis type="category" dataKey="x" tick={<GraduationGauche max={maxGauche} />} width={largeurGauche} interval={0} />
         {bulle}
         <Bar dataKey="y" name={graphique.libelle_y} onClick={cliquer} cursor={cliquable ? 'pointer' : undefined} radius={[0, 4, 4, 0]}>
           {donnees.map((d, i) => <Cell key={i} fill={petit(d.nb) ? COULEUR_PETIT_GROUPE : COULEURS[1]} />)}
@@ -144,7 +210,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
     rendu = (
       <BarChart data={donnees} margin={marges}>
         <CartesianGrid stroke={COULEUR_GRILLE} vertical={false} />
-        <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(v, donnees.length > 6 ? 8 : 14)} interval={0} label={labelX} />
+        <XAxis dataKey="x" tick={<GraduationBas max={maxBas} />} interval={0} height={hauteurAxeBas} label={labelX} />
         <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} />
         {bulle}
         {series.length ? (
@@ -170,7 +236,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
       <h3 className="font-semibold text-texte-titre text-sm mb-3">
         <span className="text-texte-discret font-normal">{numero}. </span>{graphique.titre}
       </h3>
-      <div className={type === 'barres_horizontales' && donnees.length > 8 ? 'h-96' : 'h-72'}>
+      <div style={{ height: type === 'barres_horizontales' ? Math.max(288, donnees.length * (lignesGauche * 14 + 16) + 70) : 288 + (lignesBas - 1) * 14 }}>
         {donnees.length ? <ResponsiveContainer width="100%" height="100%">{rendu}</ResponsiveContainer> : rendu}
       </div>
       {graphique.phrase && <p className="text-sm text-texte-secondaire mt-3">{graphique.phrase}</p>}
