@@ -53,17 +53,17 @@ export default function ReinitalisationMdp() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-      <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-sm">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-fond-doux">
+      <div className="bg-fond rounded-2xl w-full max-w-md p-8 shadow-sm">
         <h1 className="font-bold text-xl mb-6">Nouveau mot de passe</h1>
 
         {succes ? (
           <div className="text-center py-4">
-            <p className="font-semibold text-gray-800 mb-2">Mot de passe mis à jour !</p>
-            <p className="text-sm text-gray-500">Vous allez être redirigé vers l'accueil...</p>
+            <p className="font-semibold text-texte mb-2">Mot de passe mis à jour !</p>
+            <p className="text-sm text-texte-doux">Vous allez être redirigé vers l'accueil...</p>
           </div>
         ) : !sessionValide ? (
-          <p className="text-red-600 text-sm">{erreur}</p>
+          <p className="text-texte-erreur text-sm">{erreur}</p>
         ) : (
           <form onSubmit={reinitialiser} className="space-y-4">
             <div>
@@ -75,12 +75,12 @@ export default function ReinitalisationMdp() {
                   value={mdp}
                   onChange={e => setMdp(e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500"
+                  className="w-full border border-bordure-champ rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-bordure-focus"
                 />
                 <button
                   type="button"
                   onClick={() => setMdpVisible(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-texte-discret hover:text-texte-secondaire"
                 >
                   <IcôneOeil visible={mdpVisible} />
                 </button>
@@ -95,22 +95,22 @@ export default function ReinitalisationMdp() {
                   value={confirmation}
                   onChange={e => setConfirmation(e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500"
+                  className="w-full border border-bordure-champ rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-bordure-focus"
                 />
                 <button
                   type="button"
                   onClick={() => setConfirmationVisible(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-texte-discret hover:text-texte-secondaire"
                 >
                   <IcôneOeil visible={confirmationVisible} />
                 </button>
               </div>
             </div>
-            {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
+            {erreur && <p className="text-texte-erreur text-sm">{erreur}</p>}
             <button
               type="submit"
               disabled={chargement}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium"
+              className="w-full bg-principal hover:bg-principal-survol disabled:opacity-60 text-texte-inverse py-3 rounded-lg font-medium"
             >
               {chargement ? 'Mise à jour...' : 'Mettre à jour'}
             </button>

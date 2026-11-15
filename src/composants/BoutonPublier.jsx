@@ -228,21 +228,21 @@ function FormulaireDataset({ onFermer }) {
 
   const classeBoutonChoix = (actif) =>
     `flex-1 text-xs font-medium px-3 py-2 rounded-lg border transition-colors ${actif
-      ? 'bg-blue-600 border-blue-600 text-white'
-      : 'bg-white border-blue-300 text-blue-700 hover:bg-blue-100'}`
+      ? 'bg-principal border-principal text-texte-inverse'
+      : 'bg-fond border-bordure-bleu text-texte-principal-fonce hover:bg-fond-bleu-pale'}`
 
   return (
     <form onSubmit={publier} className="p-5 space-y-4">
       <div onClick={() => inputRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); choisirFichier(e.dataTransfer.files[0]) }}
-        className="border-2 border-dashed border-blue-300 rounded-xl p-6 text-center cursor-pointer hover:bg-blue-50 transition-colors">
+        className="border-2 border-dashed border-bordure-bleu rounded-xl p-6 text-center cursor-pointer hover:bg-fond-bleu-clair transition-colors">
         <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls,.json" className="hidden"
           onClick={e => { e.target.value = '' }} onChange={e => choisirFichier(e.target.files[0])} />
         {fichier ? (
-          <div className="flex items-center justify-center gap-2 text-blue-700 font-medium text-sm">
+          <div className="flex items-center justify-center gap-2 text-texte-principal-fonce font-medium text-sm">
             <CheckCircle size={18} />{fichier.name}
           </div>
         ) : (
-          <div className="text-gray-400">
+          <div className="text-texte-discret">
             <Upload size={28} className="mx-auto mb-2" />
             <p className="text-sm">Glissez un fichier ou cliquez pour choisir</p>
             <p className="text-xs mt-1">CSV, Excel, JSON</p>
@@ -250,45 +250,45 @@ function FormulaireDataset({ onFermer }) {
         )}
       </div>
 
-      <p className="text-xs text-gray-400 text-center -mt-2">
+      <p className="text-xs text-texte-discret text-center -mt-2">
         Formats acceptés : CSV, Excel (.xlsx, .xls), JSON · Taille maximale : {TAILLE_MAX_MO} Mo
       </p>
 
       {erreurFichier && (
-        <div className="flex gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-          <XCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-red-800">{erreurFichier}</p>
+        <div className="flex gap-2 bg-fond-erreur border border-bordure-erreur rounded-xl px-3 py-2">
+          <XCircle size={16} className="text-texte-erreur-vif shrink-0 mt-0.5" />
+          <p className="text-xs text-texte-erreur-tres-fonce">{erreurFichier}</p>
         </div>
       )}
 
       {!fichier && (
-        <p className="text-xs text-gray-500 text-center">
+        <p className="text-xs text-texte-doux text-center">
           💡 Vous avez modifié un fichier déjà publié ? Déposez simplement la nouvelle version : nous la reconnaîtrons automatiquement.
         </p>
       )}
 
-      {analyse && <p className="text-sm text-blue-600 text-center">Analyse en cours...</p>}
+      {analyse && <p className="text-sm text-principal text-center">Analyse en cours...</p>}
 
       {bloque && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-3 space-y-2">
+        <div className="bg-fond-erreur border border-bordure-erreur rounded-xl px-3 py-3 space-y-2">
           <div className="flex gap-2">
-            <XCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-800">
+            <XCircle size={16} className="text-texte-erreur-vif shrink-0 mt-0.5" />
+            <p className="text-xs text-texte-erreur-tres-fonce">
               Vous avez déjà publié ce fichier : <strong>« {comparaison.jeu?.titre} »</strong>. Les doublons ne sont pas acceptés.
             </p>
           </div>
           <button type="button" onClick={annuler}
-            className="w-full text-xs font-medium px-3 py-2 rounded-lg border border-red-300 text-red-700 bg-white hover:bg-red-100">
+            className="w-full text-xs font-medium px-3 py-2 rounded-lg border border-bordure-erreur-forte text-texte-erreur-fonce bg-fond hover:bg-fond-erreur-survol">
             Annuler
           </button>
         </div>
       )}
 
       {resultat === 'identique_autre_format' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 space-y-2">
+        <div className="bg-fond-bleu-clair border border-bordure-bleu-clair rounded-xl px-3 py-3 space-y-2">
           <div className="flex gap-2">
-            <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-800">
+            <Info size={16} className="text-texte-bleu-vif shrink-0 mt-0.5" />
+            <p className="text-xs text-texte-bleu-fonce">
               Ce fichier a le même contenu que votre jeu <strong>« {comparaison.jeu?.titre} »</strong>. Il sera ajouté au format {NOMS_FORMATS[extension] ?? extension?.toUpperCase()}.
             </p>
           </div>
@@ -300,10 +300,10 @@ function FormulaireDataset({ onFermer }) {
       )}
 
       {resultat === 'nouvelle_version' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-3 space-y-2">
+        <div className="bg-fond-bleu-clair border border-bordure-bleu-clair rounded-xl px-3 py-3 space-y-2">
           <div className="flex gap-2">
-            <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-800">
+            <Info size={16} className="text-texte-bleu-vif shrink-0 mt-0.5" />
+            <p className="text-xs text-texte-bleu-fonce">
               Ce fichier ressemble à votre jeu <strong>« {comparaison.jeu?.titre} »</strong> ({Math.round(comparaison.pct_lignes)} % de lignes identiques).
             </p>
           </div>
@@ -315,45 +315,45 @@ function FormulaireDataset({ onFermer }) {
       )}
 
       {avertissementGlobal && (
-        <div className="flex gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
-          <AlertTriangle size={16} className="text-blue-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-900">{avertissementGlobal}</p>
+        <div className="flex gap-2 bg-fond-bleu-clair border border-bordure-bleu-pale rounded-xl px-3 py-2">
+          <AlertTriangle size={16} className="text-principal shrink-0 mt-0.5" />
+          <p className="text-xs text-texte-bleu-nuit">{avertissementGlobal}</p>
         </div>
       )}
 
       <div>
         <label className="block text-sm font-medium mb-1">Titre *</label>
         <input value={titre} onChange={e => setTitre(e.target.value)} required
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
-        {titre && <p className="text-xs text-gray-400 mt-1">Ce titre sera utilisé comme nom du fichier sur la plateforme.</p>}
+          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus" />
+        {titre && <p className="text-xs text-texte-discret mt-1">Ce titre sera utilisé comme nom du fichier sur la plateforme.</p>}
       </div>
 
       <div>
         <label className="block text-sm font-medium mb-1">Description *</label>
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} required
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium mb-1">Source</label>
           <input value={source} onChange={e => setSource(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus" />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Catégorie *</label>
           <select value={categorieId} onChange={e => setCategorieId(e.target.value)} required
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
+            className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus bg-fond">
             <option value="">-- Choisir --</option>
             {categories.map(c => <option key={c.id} value={String(c.id)}>{c.nom}</option>)}
           </select>
         </div>
       </div>
 
-      {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
+      {erreur && <p className="text-texte-erreur text-sm">{erreur}</p>}
 
       <button type="submit" disabled={!peutPublier}
-        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-lg font-medium text-sm">
+        className="w-full bg-principal hover:bg-principal-survol disabled:opacity-50 text-texte-inverse py-3 rounded-lg font-medium text-sm">
         {chargement ? 'Publication...' : verification ? 'Vérification...' : 'Publier'}
       </button>
     </form>
@@ -406,17 +406,17 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
       <div>
         <label className="block text-sm font-medium mb-1">Titre *</label>
         <input value={titre} onChange={e => setTitre(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus" />
       </div>
       <div>
         <label className="block text-sm font-medium mb-1">Description</label>
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus" />
       </div>
       <div>
         <label className="block text-sm font-medium mb-1">Catégorie (facultatif)</label>
         <select value={categorie} onChange={e => setCategorie(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
+          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-bordure-focus bg-fond">
           <option value="">-- Choisir --</option>
           {['Économie','Santé','Éducation','Agriculture','Transport','Environnement','Démographie','Sport','Culture','Sécurité & Justice'].map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -425,10 +425,10 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
         <label className="block text-sm font-medium mb-1">Code d’intégration *</label>
         <textarea value={codeEmbed} onChange={e => setCodeEmbed(e.target.value)} rows={4}
           placeholder='<iframe src="https://..." ...></iframe>'
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" />
-        <p className="text-xs text-gray-400 mt-1">Collez le code d’intégration (iframe) : Power BI, Tableau Public, Looker Studio, ou toute visualisation en ligne (Python, JavaScript…).</p>
-        <details className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-          <summary className="cursor-pointer font-medium text-blue-600">Où trouver ce code ?</summary>
+          className="w-full border border-bordure-champ rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-bordure-focus" />
+        <p className="text-xs text-texte-discret mt-1">Collez le code d’intégration (iframe) : Power BI, Tableau Public, Looker Studio, ou toute visualisation en ligne (Python, JavaScript…).</p>
+        <details className="mt-2 text-xs text-texte-secondaire bg-fond-doux border border-bordure rounded-lg px-3 py-2">
+          <summary className="cursor-pointer font-medium text-principal">Où trouver ce code ?</summary>
           <ul className="mt-2 space-y-1.5 list-disc pl-4">
             <li><strong>Power BI</strong> : Fichier → Incorporer le rapport → Publier sur le web → copier le code &lt;iframe&gt;</li>
             <li><strong>Looker Studio</strong> : Partager → Intégrer le rapport → copier le code d’intégration</li>
@@ -436,9 +436,9 @@ function FormulaireVisualisation({ onFermer, onPublie }) {
           </ul>
         </details>
       </div>
-      {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
+      {erreur && <p className="text-texte-erreur text-sm">{erreur}</p>}
       <button type="submit" disabled={chargement}
-        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-lg font-medium text-sm">
+        className="w-full bg-principal hover:bg-principal-survol disabled:opacity-50 text-texte-inverse py-3 rounded-lg font-medium text-sm">
         {chargement ? 'Publication...' : 'Publier'}
       </button>
     </form>
@@ -534,27 +534,27 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
   return (
     <>
       <button onClick={ouvrir}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        className="flex items-center gap-2 bg-bouton-publier hover:bg-bouton-publier-survol text-texte-inverse px-4 py-2 rounded-lg text-sm font-medium">
         <Plus size={16} />
         Publier sur OpenData
       </button>
 
       {ouvert && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={fermer}>
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        <div className="fixed inset-0 bg-voile/50 z-50 flex items-center justify-center p-4" onClick={fermer}>
+          <div className="bg-fond rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
 
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            <div className="flex items-center justify-between p-5 border-b border-bordure-legere">
               {etape !== 'choix' && etape !== 'non_connecte' && (
-                <button onClick={() => setEtape('choix')} className="text-sm text-gray-400 hover:text-gray-600 mr-3">
+                <button onClick={() => setEtape('choix')} className="text-sm text-texte-discret hover:text-texte-secondaire mr-3">
                   ← Retour
                 </button>
               )}
               <div>
                 <h2 className="font-bold text-lg">Publier sur OpenData</h2>
-                {etape === 'choix' && <p className="text-sm text-gray-400">Que souhaitez-vous publier ?</p>}
+                {etape === 'choix' && <p className="text-sm text-texte-discret">Que souhaitez-vous publier ?</p>}
               </div>
-              <button onClick={fermer} className="text-gray-400 hover:text-gray-600 ml-auto">
+              <button onClick={fermer} className="text-texte-discret hover:text-texte-secondaire ml-auto">
                 <X size={20} />
               </button>
             </div>
@@ -563,36 +563,36 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
               <div className="p-5">
                 {vueConnexion === 'connexion' && (
                   <form onSubmit={connecterDepuisPublier} className="space-y-4">
-                    <p className="text-sm text-gray-500">Connectez-vous pour publier sur OpenData.</p>
+                    <p className="text-sm text-texte-doux">Connectez-vous pour publier sur OpenData.</p>
                     <div>
                       <label className="block text-sm font-medium mb-1">Email</label>
                       <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required placeholder="nom@gmail.com"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
+                        className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-sm font-medium">Mot de passe</label>
                         <button type="button" onClick={() => changerVueCo('mot_de_passe_oublie')}
-                          className="text-xs text-blue-600 hover:underline">Mot de passe oublié ?</button>
+                          className="text-xs text-principal hover:underline">Mot de passe oublié ?</button>
                       </div>
                       <div className="relative">
                         <input type={mdpVisible ? 'text' : 'password'} value={mdpCo} onChange={e => setMdpCo(e.target.value)} required placeholder="Votre mot de passe"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500" />
+                          className="w-full border border-bordure-champ rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-bordure-focus" />
                         <button type="button" onClick={() => setMdpVisible(v => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-texte-discret hover:text-texte-secondaire">
                           <IcôneOeil visible={mdpVisible} />
                         </button>
                       </div>
                     </div>
-                    {erreurCo && <p className="text-red-600 text-sm">{erreurCo}</p>}
+                    {erreurCo && <p className="text-texte-erreur text-sm">{erreurCo}</p>}
                     <button type="submit" disabled={chargementCo}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium">
+                      className="w-full bg-principal hover:bg-principal-survol disabled:opacity-60 text-texte-inverse py-3 rounded-lg font-medium">
                       {chargementCo ? 'Connexion...' : 'Se connecter'}
                     </button>
-                    <p className="text-center text-sm text-gray-500">
+                    <p className="text-center text-sm text-texte-doux">
                       Pas encore de compte ?{' '}
                       <button type="button" onClick={() => changerVueCo('inscription')}
-                        className="text-blue-600 font-medium hover:underline">S'inscrire</button>
+                        className="text-principal font-medium hover:underline">S'inscrire</button>
                     </p>
                   </form>
                 )}
@@ -600,29 +600,29 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                 {vueConnexion === 'mot_de_passe_oublie' && (
                   reinitReussie ? (
                     <div className="text-center py-4">
-                      <p className="font-semibold text-gray-800 mb-2">Email envoyé</p>
-                      <p className="text-gray-500 text-sm">
+                      <p className="font-semibold text-texte mb-2">Email envoyé</p>
+                      <p className="text-texte-doux text-sm">
                         Un lien de réinitialisation a été envoyé à <strong>{emailCo}</strong>. Vérifiez votre boîte de réception.
                       </p>
-                      <button type="button" onClick={() => changerVueCo('connexion')} className="mt-4 text-sm text-blue-600 hover:underline">
+                      <button type="button" onClick={() => changerVueCo('connexion')} className="mt-4 text-sm text-principal hover:underline">
                         Retour à la connexion
                       </button>
                     </div>
                   ) : (
                     <form onSubmit={reinitialiserDepuisPublier} className="space-y-4">
-                      <p className="text-sm text-gray-500">Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.</p>
+                      <p className="text-sm text-texte-doux">Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.</p>
                       <div>
                         <label className="block text-sm font-medium mb-1">Email</label>
                         <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required placeholder="nom@gmail.com"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
+                          className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus" />
                       </div>
-                      {erreurCo && <p className="text-red-600 text-sm">{erreurCo}</p>}
+                      {erreurCo && <p className="text-texte-erreur text-sm">{erreurCo}</p>}
                       <button type="submit" disabled={chargementCo}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium">
+                        className="w-full bg-principal hover:bg-principal-survol disabled:opacity-60 text-texte-inverse py-3 rounded-lg font-medium">
                         {chargementCo ? 'Envoi...' : 'Envoyer le lien'}
                       </button>
-                      <p className="text-center text-sm text-gray-500">
-                        <button type="button" onClick={() => changerVueCo('connexion')} className="text-blue-600 font-medium hover:underline">
+                      <p className="text-center text-sm text-texte-doux">
+                        <button type="button" onClick={() => changerVueCo('connexion')} className="text-principal font-medium hover:underline">
                           Retour à la connexion
                         </button>
                       </p>
@@ -633,46 +633,46 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
                 {vueConnexion === 'inscription' && (
                   inscriptionReussie ? (
                     <div className="text-center py-4">
-                      <p className="font-semibold text-gray-800 mb-2">Vérifiez votre email</p>
-                      <p className="text-gray-500 text-sm">
+                      <p className="font-semibold text-texte mb-2">Vérifiez votre email</p>
+                      <p className="text-texte-doux text-sm">
                         Un lien de confirmation a été envoyé à <strong>{emailCo}</strong>.
                       </p>
-                      <button onClick={fermer} className="mt-4 text-sm text-blue-600 hover:underline">Fermer</button>
+                      <button onClick={fermer} className="mt-4 text-sm text-principal hover:underline">Fermer</button>
                     </div>
                   ) : (
                     <form onSubmit={inscrireDepuisPublier} className="space-y-4">
-                      <p className="text-sm text-gray-500">Créez un compte pour publier sur OpenData.</p>
+                      <p className="text-sm text-texte-doux">Créez un compte pour publier sur OpenData.</p>
                       <div>
                         <label className="block text-sm font-medium mb-1">Pseudo</label>
                         <input type="text" value={pseudoCo} onChange={e => setPseudoCo(e.target.value)} required
                           placeholder="Ex. : data_analyst225"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
+                          className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Email</label>
                         <input type="email" value={emailCo} onChange={e => setEmailCo(e.target.value)} required placeholder="nom@gmail.com"
-                          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500" />
+                          className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Mot de passe</label>
                         <div className="relative">
                           <input type={mdpVisible ? 'text' : 'password'} value={mdpCo} onChange={e => setMdpCo(e.target.value)} required placeholder="6 caractères minimum"
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500" />
+                            className="w-full border border-bordure-champ rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-bordure-focus" />
                           <button type="button" onClick={() => setMdpVisible(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-texte-discret hover:text-texte-secondaire">
                             <IcôneOeil visible={mdpVisible} />
                           </button>
                         </div>
                       </div>
-                      {erreurCo && <p className="text-red-600 text-sm">{erreurCo}</p>}
+                      {erreurCo && <p className="text-texte-erreur text-sm">{erreurCo}</p>}
                       <button type="submit" disabled={chargementCo}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium">
+                        className="w-full bg-principal hover:bg-principal-survol disabled:opacity-60 text-texte-inverse py-3 rounded-lg font-medium">
                         {chargementCo ? 'Inscription...' : "S'inscrire"}
                       </button>
-                      <p className="text-center text-sm text-gray-500">
+                      <p className="text-center text-sm text-texte-doux">
                         Déjà un compte ?{' '}
                         <button type="button" onClick={() => changerVueCo('connexion')}
-                          className="text-blue-600 font-medium hover:underline">Se connecter</button>
+                          className="text-principal font-medium hover:underline">Se connecter</button>
                       </p>
                     </form>
                   )
@@ -683,24 +683,24 @@ export default function BoutonPublier({ onVisualisationPubliee }) {
             {etape === 'choix' && (
               <div className="p-5 grid grid-cols-2 gap-4">
                 <button onClick={() => setEtape('dataset')}
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors text-center">
-                  <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Database size={22} className="text-blue-600" />
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-bordure hover:border-bordure-bleu-doux hover:bg-fond-bleu-clair transition-colors text-center">
+                  <div className="w-12 h-12 rounded-full bg-fond-bleu-pale flex items-center justify-center">
+                    <Database size={22} className="text-principal" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Jeu de données</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Publier un fichier CSV, Excel, JSON</p>
+                    <p className="text-xs text-texte-discret mt-0.5">Publier un fichier CSV, Excel, JSON</p>
                   </div>
                 </button>
 
                 <button onClick={() => setEtape('visualisation')}
-                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors text-center">
-                  <div className="w-12 h-12 rounded-full bg-blue-900 flex items-center justify-center">
-                    <ChartColumnBig size={22} className="text-white" />
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-bordure hover:border-bordure-bleu-doux hover:bg-fond-bleu-clair transition-colors text-center">
+                  <div className="w-12 h-12 rounded-full bg-bleu-nuit flex items-center justify-center">
+                    <ChartColumnBig size={22} className="text-texte-inverse" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Dashboard</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Partager un dashboard interactif (Power BI, Tableau, Looker Studio…)</p>
+                    <p className="text-xs text-texte-discret mt-0.5">Partager un dashboard interactif (Power BI, Tableau, Looker Studio…)</p>
                   </div>
                 </button>
               </div>

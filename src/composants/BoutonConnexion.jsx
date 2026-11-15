@@ -69,13 +69,13 @@ function BoutonUtilisateurConnecte({ utilisateur, onDeconnecter }) {
   return (
     <div className="flex items-center gap-2">
       {pseudo && (
-        <span className="text-sm text-gray-700 font-medium">
+        <span className="text-sm text-texte-moyen font-medium">
           {pseudo}
         </span>
       )}
       <button
         onClick={onDeconnecter}
-        className="flex items-center gap-1 text-sm text-gray-600 hover:text-red-600 border border-gray-200 px-3 py-2 rounded-lg"
+        className="flex items-center gap-1 text-sm text-texte-secondaire hover:text-texte-erreur border border-bordure px-3 py-2 rounded-lg"
       >
         <IcôneDeconnexion /> Déconnexion
       </button>
@@ -173,18 +173,18 @@ export default function BoutonConnexion() {
     <>
       <button
         onClick={ouvrir}
-        className="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 border border-gray-200 px-4 py-2 rounded-lg"
+        className="flex items-center gap-1 text-sm text-texte-secondaire hover:text-principal border border-bordure px-4 py-2 rounded-lg"
       >
         <IcôneConnexion /> Se connecter
       </button>
 
       {ouvert && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-voile/50 z-50 flex items-center justify-center p-4"
           onClick={fermer}
         >
           <div
-            className="bg-white rounded-2xl w-full max-w-md p-6"
+            className="bg-fond rounded-2xl w-full max-w-md p-6"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
@@ -193,7 +193,7 @@ export default function BoutonConnexion() {
                 {vue === 'inscription' && 'Créer un compte'}
                 {vue === 'mot_de_passe_oublie' && 'Mot de passe oublié'}
               </h2>
-              <button onClick={fermer} className="text-gray-400 hover:text-gray-600">
+              <button onClick={fermer} className="text-texte-discret hover:text-texte-secondaire">
                 <IcôneFermer />
               </button>
             </div>
@@ -208,7 +208,7 @@ export default function BoutonConnexion() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     required
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                    className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus"
                   />
                 </div>
                 <div>
@@ -217,7 +217,7 @@ export default function BoutonConnexion() {
                     <button
                       type="button"
                       onClick={() => changerVue('mot_de_passe_oublie')}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-principal hover:underline"
                     >
                       Mot de passe oublié ?
                     </button>
@@ -229,31 +229,31 @@ export default function BoutonConnexion() {
                       value={mdp}
                       onChange={e => setMdp(e.target.value)}
                       required
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500"
+                      className="w-full border border-bordure-champ rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-bordure-focus"
                     />
                     <button
                       type="button"
                       onClick={() => setMdpVisible(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-texte-discret hover:text-texte-secondaire"
                     >
                       <IcôneOeil visible={mdpVisible} />
                     </button>
                   </div>
                 </div>
-                {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
+                {erreur && <p className="text-texte-erreur text-sm">{erreur}</p>}
                 <button
                   type="submit"
                   disabled={chargement}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium"
+                  className="w-full bg-principal hover:bg-principal-survol disabled:opacity-60 text-texte-inverse py-3 rounded-lg font-medium"
                 >
                   {chargement ? 'Connexion...' : 'Se connecter'}
                 </button>
-                <p className="text-center text-sm text-gray-500">
+                <p className="text-center text-sm text-texte-doux">
                   Pas encore de compte ?{' '}
                   <button
                     type="button"
                     onClick={() => changerVue('inscription')}
-                    className="text-blue-600 font-medium hover:underline"
+                    className="text-principal font-medium hover:underline"
                   >
                     S'inscrire
                   </button>
@@ -264,11 +264,11 @@ export default function BoutonConnexion() {
             {vue === 'inscription' && (
               inscriptionReussie ? (
                 <div className="text-center py-4">
-                  <p className="font-semibold text-gray-800 mb-2">Vérifiez votre email</p>
-                  <p className="text-gray-500 text-sm">
+                  <p className="font-semibold text-texte mb-2">Vérifiez votre email</p>
+                  <p className="text-texte-doux text-sm">
                     Un lien de confirmation a été envoyé à <strong>{email}</strong>.
                   </p>
-                  <button onClick={fermer} className="mt-4 text-sm text-blue-600 hover:underline">
+                  <button onClick={fermer} className="mt-4 text-sm text-principal hover:underline">
                     Fermer
                   </button>
                 </div>
@@ -282,7 +282,7 @@ export default function BoutonConnexion() {
                       onChange={e => setPseudo(e.target.value)}
                       required
                       placeholder="Ex. : data_analyst225"
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                      className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus"
                     />
                   </div>
                   <div>
@@ -293,7 +293,7 @@ export default function BoutonConnexion() {
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       required
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                      className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus"
                     />
                   </div>
                   <div>
@@ -305,31 +305,31 @@ export default function BoutonConnexion() {
                         value={mdp}
                         onChange={e => setMdp(e.target.value)}
                         required
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-blue-500"
+                        className="w-full border border-bordure-champ rounded-lg px-4 py-3 pr-11 focus:outline-none focus:border-bordure-focus"
                       />
                       <button
                         type="button"
                         onClick={() => setMdpVisible(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-texte-discret hover:text-texte-secondaire"
                       >
                         <IcôneOeil visible={mdpVisible} />
                       </button>
                     </div>
                   </div>
-                  {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
+                  {erreur && <p className="text-texte-erreur text-sm">{erreur}</p>}
                   <button
                     type="submit"
                     disabled={chargement}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium"
+                    className="w-full bg-principal hover:bg-principal-survol disabled:opacity-60 text-texte-inverse py-3 rounded-lg font-medium"
                   >
                     {chargement ? 'Inscription...' : "S'inscrire"}
                   </button>
-                  <p className="text-center text-sm text-gray-500">
+                  <p className="text-center text-sm text-texte-doux">
                     Déjà un compte ?{' '}
                     <button
                       type="button"
                       onClick={() => changerVue('connexion')}
-                      className="text-blue-600 font-medium hover:underline"
+                      className="text-principal font-medium hover:underline"
                     >
                       Se connecter
                     </button>
@@ -341,21 +341,21 @@ export default function BoutonConnexion() {
             {vue === 'mot_de_passe_oublie' && (
               reinitReussie ? (
                 <div className="text-center py-4">
-                  <p className="font-semibold text-gray-800 mb-2">Email envoyé</p>
-                  <p className="text-gray-500 text-sm">
+                  <p className="font-semibold text-texte mb-2">Email envoyé</p>
+                  <p className="text-texte-doux text-sm">
                     Un lien de réinitialisation a été envoyé à <strong>{email}</strong>.
                     Vérifiez votre boîte de réception.
                   </p>
                   <button
                     onClick={() => changerVue('connexion')}
-                    className="mt-4 text-sm text-blue-600 hover:underline"
+                    className="mt-4 text-sm text-principal hover:underline"
                   >
                     Retour à la connexion
                   </button>
                 </div>
               ) : (
                 <form onSubmit={reinitialiserMotDePasse} className="space-y-4">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-texte-doux">
                     Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
                   </p>
                   <div>
@@ -366,22 +366,22 @@ export default function BoutonConnexion() {
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       required
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                      className="w-full border border-bordure-champ rounded-lg px-4 py-3 focus:outline-none focus:border-bordure-focus"
                     />
                   </div>
-                  {erreur && <p className="text-red-600 text-sm">{erreur}</p>}
+                  {erreur && <p className="text-texte-erreur text-sm">{erreur}</p>}
                   <button
                     type="submit"
                     disabled={chargement}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-medium"
+                    className="w-full bg-principal hover:bg-principal-survol disabled:opacity-60 text-texte-inverse py-3 rounded-lg font-medium"
                   >
                     {chargement ? 'Envoi...' : 'Envoyer le lien'}
                   </button>
-                  <p className="text-center text-sm text-gray-500">
+                  <p className="text-center text-sm text-texte-doux">
                     <button
                       type="button"
                       onClick={() => changerVue('connexion')}
-                      className="text-blue-600 font-medium hover:underline"
+                      className="text-principal font-medium hover:underline"
                     >
                       Retour à la connexion
                     </button>

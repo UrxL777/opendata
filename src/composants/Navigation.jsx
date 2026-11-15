@@ -29,18 +29,18 @@ export default function Navigation() {
 
   const lienActif = (chemin) =>
     location.pathname === chemin
-      ? 'text-blue-600 border-b-2 border-blue-600 pb-1'
-      : 'text-gray-600 hover:text-blue-600'
+      ? 'text-principal border-b-2 border-principal pb-1'
+      : 'text-texte-secondaire hover:text-principal'
 
   const lienActifMobile = (chemin) =>
     location.pathname === chemin
-      ? 'text-blue-600 font-semibold'
-      : 'text-gray-700'
+      ? 'text-principal font-semibold'
+      : 'text-texte-moyen'
 
   function fermerMenu() { setMenuOuvert(false) }
 
   return (
-    <header className="bg-white border-b border-gray-100">
+    <header className="bg-navbar border-b border-bordure-legere">
 
       {/* ── Barre principale ── */}
       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
@@ -59,7 +59,7 @@ export default function Navigation() {
           <BoutonConnexion />
           {/* Hamburger — visible seulement sur mobile */}
           <button
-            className="md:hidden text-gray-600 hover:text-blue-600 p-1"
+            className="md:hidden text-texte-secondaire hover:text-principal p-1"
             onClick={() => setMenuOuvert(v => !v)}
           >
             {menuOuvert ? <IcôneFermer /> : <IcôneMenu />}
@@ -68,7 +68,7 @@ export default function Navigation() {
       </div>
 
       {/* ── Sous-barre desktop : liens + Publier — cachée sur mobile ── */}
-      <div className="hidden md:block border-t border-gray-100">
+      <div className="hidden md:block border-t border-bordure-legere">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-11">
           <nav className="flex items-center gap-8">
             <Link to="/" className={`text-sm font-medium ${lienActif('/')}`}>Accueil</Link>
@@ -81,18 +81,18 @@ export default function Navigation() {
 
       {/* ── Menu mobile déroulant ── */}
       {menuOuvert && (
-        <div className="md:hidden border-t border-gray-100 bg-white shadow-sm">
+        <div className="md:hidden border-t border-bordure-legere bg-navbar shadow-sm">
           <nav className="px-4 py-2 flex flex-col">
             <Link to="/" onClick={fermerMenu}
-              className={`text-sm font-medium py-3 border-b border-gray-100 ${lienActifMobile('/')}`}>
+              className={`text-sm font-medium py-3 border-b border-bordure-legere ${lienActifMobile('/')}`}>
               Accueil
             </Link>
             <Link to="/donnees" onClick={fermerMenu}
-              className={`text-sm font-medium py-3 border-b border-gray-100 ${lienActifMobile('/donnees')}`}>
+              className={`text-sm font-medium py-3 border-b border-bordure-legere ${lienActifMobile('/donnees')}`}>
               Données
             </Link>
             <Link to="/visualisation" onClick={fermerMenu}
-              className={`text-sm font-medium py-3 border-b border-gray-100 ${lienActifMobile('/visualisation')}`}>
+              className={`text-sm font-medium py-3 border-b border-bordure-legere ${lienActifMobile('/visualisation')}`}>
               Dashboards
             </Link>
             <div className="pt-3 pb-2">

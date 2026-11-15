@@ -18,7 +18,7 @@ function RemonterEnHaut() {
 export default function App() {
 
   return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="min-h-screen bg-fond-doux flex flex-col">
         <RemonterEnHaut />
         <Navigation />
         <div className="flex-1">
