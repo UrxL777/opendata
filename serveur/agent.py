@@ -441,6 +441,8 @@ PROMPT_COMPRENDRE = PROMPT_ANALYSTE_ROLE + """
    - "nom" : lettres sans accent, chiffres et _ uniquement (ex. categorie_age), différent des colonnes existantes. "expression" : une formule SQL DuckDB (CASE WHEN, strftime, year…), sans SELECT ni FROM. Les noms de colonnes entre guillemets doubles.
    - Les libellés des tranches doivent se trier dans le bon ordre (ex. '18-25', '26-40' ou '1. Sous-poids', '2. Poids normal').
 7. "facteurs" : la liste des colonnes qui peuvent expliquer la colonne principale (colonnes catégorielles existantes ou colonnes calculées). Chaque facteur a entre 2 et 15 groupes. N'y mets pas les identifiants, le texte libre, les coordonnées géographiques (latitude, longitude), ni la colonne principale, ni une colonne calculée à partir de la colonne principale (une colonne ne s'explique pas par elle-même). Pour une colonne quantitative, mets sa version en tranches. Ne mets jamais à la fois une colonne et sa version calculée : choisis la plus lisible.
+   Un facteur est une CARACTÉRISTIQUE (quoi, qui, où, quand : type de produit, catégorie, lieu, période, profil…), jamais une autre mesure du même phénomène (ex. pour expliquer les ventes au détail, n'utilise pas les ventes en entrepôt ni les transferts : ce sont d'autres mesures de la même activité).
+   Si le fichier a une colonne par année ou par période (ex. colonnes 2010, 2011, 2012…), c'est un format « large » : la question centrale porte sur l'évolution dans le temps et sur les écarts entre groupes (continent, catégorie…) ; une année n'explique jamais une autre année.
 
 Réponds avec ce JSON :
 {"sujet": "...", "une_ligne_represente": "...", "colonne_principale": "...", "valeur_cible": null, "question_centrale": "...", "colonnes_calculees": [...], "facteurs": ["...", "..."]}"""
@@ -667,6 +669,8 @@ DEVISES = [
     (("$", "usd", "dollar"), r"\s?(\$|\bUSD\b|\bUS\$|\bdollars?\b)"),
     (("€", "eur", "euro"), r"\s?(€|\bEUR\b|\beuros?\b)"),
     (("fcfa", "cfa", "xof", "franc"), r"\s?(\bF ?CFA\b|\bCFA\b|\bXOF\b|\bfrancs?\b)"),
+    (("₹", "inr", "roupie", "rupee"), r"\s?(₹|\bINR\b|\broupies?\b|\brupees?\b)"),
+    (("£", "gbp", "livre", "pound"), r"\s?(£|\bGBP\b|\blivres? sterling\b)"),
 ]
 
 
