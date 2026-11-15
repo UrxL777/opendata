@@ -85,11 +85,54 @@ def _valeur_json(v):
     return v
 
 
-def _charger(con, chemin: str, filtres: dict | None) -> None:
-    """Charge le jeu de données dans la table « donnees », en appliquant les filtres."""
+NOM_VALIDE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+
+
+def verifier_colonne_calculee(colonne: dict, noms_existants: list) -> str | None:
+    """
+    Vérifie une colonne calculée proposée par l'Analyste, comme une colonne calculée Power BI.
+    Ex. {"nom": "categorie_imc", "expression": "CASE WHEN bmi < 18.5 THEN 'Sous-poids' ... END"}
+    Rend un message d'erreur, ou None si elle est acceptable.
+    """
+    nom = str(colonne.get("nom", ""))
+    expression = str(colonne.get("expression", "")).strip()
+    if not NOM_VALIDE.match(nom):
+        return f"Nom de colonne calculée invalide : « {nom} » (minuscules, chiffres et _ uniquement)."
+    if nom in noms_existants:
+        return f"La colonne « {nom} » existe déjà."
+    if not expression:
+        return f"Expression vide pour la colonne « {nom} »."
+    sans_textes = re.sub(r"'(?:[^']|'')*'", "''", _sans_commentaires(expression))
+    mots = set(re.findall(r"[a-z_]+", sans_textes.lower()))
+    if ";" in sans_textes or mots & (MOTS_INTERDITS | {"select", "from", "union"}) or FONCTIONS_INTERDITES.search(sans_textes):
+        return f"Expression interdite pour la colonne « {nom} » : seule une formule (ex. CASE WHEN) est permise."
+    return None
+
+
+def _charger(con, chemin: str, filtres: dict | None, colonnes_calculees: list | None) -> None:
+    """
+    Charge le jeu de données dans la table « donnees » :
+    1. lecture du fichier ;  2. plus aucun accès aux fichiers ;
+    3. ajout des colonnes calculées ;  4. application des filtres.
+    """
     chemin_sql = "'" + chemin.replace("'", "''") + "'"
     lecture = "read_parquet" if chemin.lower().endswith(".parquet") else "read_csv_auto"
-    con.execute(f"CREATE TABLE donnees_completes AS SELECT * FROM {lecture}({chemin_sql})")
+    con.execute(f"CREATE TABLE donnees_brutes AS SELECT * FROM {lecture}({chemin_sql})")
+
+    # À partir d'ici, DuckDB ne peut plus lire aucun fichier
+    con.execute("SET enable_external_access = false")
+
+    # Colonnes calculées (catégorie IMC, tranches d'âge…), chacune vérifiée avant d'être ajoutée
+    colonnes = [ligne[0] for ligne in con.execute("DESCRIBE donnees_brutes").fetchall()]
+    ajouts = []
+    for colonne in colonnes_calculees or []:
+        probleme = verifier_colonne_calculee(colonne, colonnes + [a["nom"] for a in ajouts])
+        if probleme:
+            raise ValueError(probleme)
+        ajouts.append(colonne)
+    selection = ", ".join(["*"] + [f"({c['expression']}) AS {_guillemets(c['nom'])}" for c in ajouts])
+    con.execute(f"CREATE TABLE donnees_completes AS SELECT {selection} FROM donnees_brutes")
+    con.execute("DROP TABLE donnees_brutes")
 
     colonnes = [ligne[0] for ligne in con.execute("DESCRIBE donnees_completes").fetchall()]
     conditions, parametres = [], []
@@ -109,13 +152,16 @@ def _charger(con, chemin: str, filtres: dict | None) -> None:
     con.execute("DROP TABLE donnees_completes")
 
 
-def executer_requete(chemin: str, sql: str, filtres: dict | None = None) -> dict:
+def executer_requete(chemin: str, sql: str, filtres: dict | None = None,
+                     colonnes_calculees: list | None = None) -> dict:
     """
     Exécute une requête de lecture sur le jeu de données propre.
 
     chemin  : fichier local du jeu de données propre (.parquet, ou .csv)
     sql     : la requête écrite par l'Analyste, qui lit la table « donnees »
     filtres : facultatif, ex. {"region": "southeast"} ou {"region": ["southeast", "northwest"]}
+              (on peut aussi filtrer sur une colonne calculée, ex. {"categorie_imc": "Obésité"})
+    colonnes_calculees : facultatif, ex. [{"nom": "categorie_imc", "expression": "CASE WHEN … END"}]
 
     Rend {"ok": True, "colonnes": [...], "lignes": [[...], ...], "tronque": bool}
     ou   {"ok": False, "erreur": "message"}.
@@ -128,10 +174,9 @@ def executer_requete(chemin: str, sql: str, filtres: dict | None = None) -> dict
     con = duckdb.connect(":memory:")
     minuteur = threading.Timer(DUREE_MAX, con.interrupt)
     try:
-        _charger(con, chemin, filtres)
+        _charger(con, chemin, filtres, colonnes_calculees)
 
-        # À partir d'ici, DuckDB ne peut plus lire de fichier ni changer ses réglages
-        con.execute("SET enable_external_access = false")
+        # DuckDB ne peut déjà plus lire de fichier ; on bloque aussi tout changement de réglage
         con.execute("SET lock_configuration = true")
 
         minuteur.start()
