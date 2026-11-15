@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 import pandas as pd
 from openai import OpenAI
 from supabase import create_client
@@ -391,10 +392,28 @@ Réponds avec ce JSON :
 {"kpi": [...], "graphiques": [...], "conclusion": "...", "ordre": ["g1", "..."]}"""
 
 
+def _attente_limite(erreur: Exception) -> float | None:
+    """
+    Si Groq refuse parce que la limite de tokens par minute est atteinte (erreur 429),
+    rend le nombre de secondes à attendre (indiqué par Groq), sinon None.
+    """
+    message = str(erreur)
+    if "429" not in message and "rate limit" not in message.lower():
+        return None
+    delai = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", message)
+    secondes = (int(delai.group(1) or 0) * 60 + float(delai.group(2))) if delai else 20.0
+    return min(secondes + 1, 90)
+
+
 def _appeler_analyste(messages: list[dict], etape: str) -> dict:
-    """Appelle le modèle et rend sa réponse JSON. Réessaie si le modèle se trompe de format."""
+    """
+    Appelle le modèle et rend sa réponse JSON.
+    Réessaie si le modèle se trompe de format, et attend si la limite de Groq est atteinte.
+    """
     messages_envoyes = list(messages)
-    for essai in range(3):
+    attentes = 0
+    essai = 0
+    while essai < 3:
         try:
             reponse = client.chat.completions.create(
                 model=MODELE,
@@ -411,8 +430,16 @@ def _appeler_analyste(messages: list[dict], etape: str) -> dict:
             print(f"[ANALYSTE] ✓ {etape} (essai {essai + 1})")
             return resultat
         except Exception as e:
+            attente = _attente_limite(e)
+            if attente is not None and attentes < 6:
+                # Limite de Groq atteinte : on patiente, sans compter cet essai comme un échec
+                attentes += 1
+                print(f"[ANALYSTE] Limite de Groq atteinte ({etape}) : attente de {attente:.0f} s")
+                time.sleep(attente)
+                continue
             print(f"[ANALYSTE] ✗ {etape}, essai {essai + 1} : {str(e)[:300]}")
-            if essai == 2:
+            essai += 1
+            if essai == 3:
                 raise
             messages_envoyes = list(messages) + [{
                 "role": "system",
