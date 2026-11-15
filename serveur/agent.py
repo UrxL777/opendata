@@ -367,24 +367,53 @@ SEUIL_IMPORTANCE = 0.15 # un facteur est important si son écart vaut au moins 1
 MAX_TOKENS_REPONSE = 3500  # tokens réservés pour chaque réponse (l'offre gratuite de Groq limite à 8 000 par minute)
 
 
-def fiche_compacte(fiche: dict, avec_exemples: bool = True) -> dict:
-    """Version allégée de la fiche, pour rester sous la limite de tokens de Groq même avec beaucoup de colonnes."""
+def _reduire_fiche(fiche: dict, niveau: int, avec_exemples: bool) -> dict:
+    """
+    Réduit la fiche par paliers :
+    1 : 6 valeurs fréquentes, 2 exemples, 5 lignes d'exemple ;  2 : 3 valeurs fréquentes, 2 lignes d'exemple ;
+    3 : l'essentiel de chaque colonne (nom, type, rôle, min, max) ;  4 : en plus, 40 colonnes au maximum.
+    """
+    essentiel = ("nom", "type", "role", "pct_manquants", "nb_valeurs_differentes", "min", "max", "premiere_date", "derniere_date")
     colonnes = []
     for c in fiche["colonnes"]:
-        petite = {k: v for k, v in c.items() if k not in ("valeurs_frequentes", "exemples", "ecart_type")}
-        if c.get("valeurs_frequentes"):
-            petite["valeurs_frequentes"] = c["valeurs_frequentes"][:6]
-        if c.get("exemples") and avec_exemples:
-            petite["exemples"] = [str(e)[:40] for e in c["exemples"][:2]]
+        if niveau >= 3:
+            petite = {k: v for k, v in c.items() if k in essentiel}
+        else:
+            petite = {k: v for k, v in c.items() if k not in ("valeurs_frequentes", "exemples", "ecart_type")}
+            if c.get("valeurs_frequentes"):
+                petite["valeurs_frequentes"] = c["valeurs_frequentes"][:6 if niveau == 1 else 3]
+            if c.get("exemples") and avec_exemples and niveau == 1:
+                petite["exemples"] = [str(e)[:40] for e in c["exemples"][:2]]
         colonnes.append(petite)
+    if niveau >= 4 and len(colonnes) > 40:
+        # On garde d'abord les colonnes utiles à l'analyse (mesures, catégories, dates)
+        utiles = [c for c in colonnes if c.get("role") in ("quantitative", "categorielle", "date")]
+        autres = [c for c in colonnes if c not in utiles]
+        colonnes = (utiles + autres)[:40]
     compacte = {k: fiche[k] for k in ("titre", "description", "nb_lignes", "nb_colonnes", "table_sql") if k in fiche}
     compacte["colonnes"] = colonnes
-    if avec_exemples:
+    if len(colonnes) < len(fiche["colonnes"]):
+        compacte["remarque"] = f"Seules {len(colonnes)} colonnes sur {len(fiche['colonnes'])} sont décrites (fichier très large)."
+    if avec_exemples and niveau <= 2:
         compacte["lignes_exemple"] = [
             {k: (str(v)[:40] if isinstance(v, str) else v) for k, v in ligne.items()}
-            for ligne in fiche.get("lignes_exemple", [])[:5]
+            for ligne in fiche.get("lignes_exemple", [])[:5 if niveau == 1 else 2]
         ]
     return compacte
+
+
+def fiche_compacte(fiche: dict, avec_exemples: bool = True, budget_tokens: int = 3000) -> dict:
+    """
+    Version allégée de la fiche, pour rester sous la limite de tokens de Groq (8 000 par minute),
+    même pour un fichier qui a des dizaines de colonnes : on réduit par paliers jusqu'à tenir dans le budget.
+    """
+    for niveau in (1, 2, 3, 4):
+        compacte = _reduire_fiche(fiche, niveau, avec_exemples)
+        if len(json.dumps(compacte, ensure_ascii=False)) / 3.5 <= budget_tokens:
+            break
+    return compacte
+
+
 TYPES_GRAPHIQUES = {"barres", "barres_horizontales", "barres_groupees", "courbe", "camembert"}
 
 PROMPT_ANALYSTE_ROLE = """Tu es l'Analyste de la plateforme OpenData : un data analyst expérimenté qui construit automatiquement un dashboard pour chaque jeu de données publié.
@@ -567,9 +596,15 @@ def _classer_facteurs(chemin: str, comprehension: dict, colonnes_calculees: list
     # Une colonne calculée à partir de la colonne principale ne peut pas l'expliquer (raisonnement circulaire)
     motif_principale = re.compile(r'(?<![\w"])"?' + re.escape(principale) + r'"?(?![\w"])')
     derivees = {c["nom"] for c in colonnes_calculees if motif_principale.search(c["expression"])}
+    # Des coordonnées GPS en tranches n'ont pas de sens pour un décideur : on les écarte
+    motif_coordonnees = re.compile(r"(^|[^a-z])(lat|lon|lng|latitude|longitude|coord|coordonnees|gps)([^a-z]|$)", re.IGNORECASE)
+    expressions = {c["nom"]: c["expression"] for c in colonnes_calculees}
     classement = []
     for facteur in comprehension.get("facteurs") or []:
         if facteur not in noms_possibles or facteur == principale or facteur in derivees:
+            continue
+        if motif_coordonnees.search(str(facteur)) or motif_coordonnees.search(expressions.get(facteur, "").replace('"', " ")):
+            print(f"[ANALYSTE] Facteur '{facteur}' écarté : coordonnées géographiques")
             continue
         f = '"' + str(facteur).replace('"', '""') + '"'
         sql = (f"SELECT {f} AS groupe, ROUND({valeur}, 2) AS valeur, COUNT(*) AS nb FROM donnees "
@@ -628,9 +663,27 @@ def _valeurs_filtre(chemin: str, colonne: str, colonnes_calculees: list) -> list
     return [{"valeur": l[0], "nb": l[1]} for l in res["lignes"]]
 
 
+DEVISES = [
+    (("$", "usd", "dollar"), r"\s?(\$|\bUSD\b|\bUS\$|\bdollars?\b)"),
+    (("€", "eur", "euro"), r"\s?(€|\bEUR\b|\beuros?\b)"),
+    (("fcfa", "cfa", "xof", "franc"), r"\s?(\bF ?CFA\b|\bCFA\b|\bXOF\b|\bfrancs?\b)"),
+]
+
+
+def retirer_devises_inventees(texte: str, reference: str) -> str:
+    """Retire d'un texte les devises qui n'apparaissent pas dans le titre, la description ou les noms de colonnes."""
+    if not texte:
+        return texte
+    reference = reference.lower()
+    for mots, motif in DEVISES:
+        if not any(m in reference for m in mots):
+            texte = re.sub(motif, "", texte, flags=re.IGNORECASE)
+    return texte.strip()
+
+
 def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement: list,
                       kpi_calcules: dict, graphiques_calcules: dict, presentation: dict,
-                      filtres: list, effectif_min: int = EFFECTIF_MIN) -> dict:
+                      filtres: list, effectif_min: int = EFFECTIF_MIN, reference: str = "") -> dict:
     """
     Le serveur CONTRÔLE le travail de l'Analyste avant de l'enregistrer :
     types de graphiques autorisés, colonnes qui existent dans les résultats, limites (4 KPI,
@@ -646,9 +699,9 @@ def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement:
         if not isinstance(valeur, (int, float)) or isinstance(valeur, bool):
             continue
         kpi.append({
-            "id": p["id"], "titre": str(p.get("titre") or calcul["titre"]),
+            "id": p["id"], "titre": retirer_devises_inventees(str(p.get("titre") or calcul["titre"]), reference),
             "format": p.get("format") if p.get("format") in ("nombre", "monnaie", "pourcentage") else "nombre",
-            "unite": str(p.get("unite") or ""), "valeur": valeur, "sql": calcul["sql"],
+            "unite": retirer_devises_inventees(str(p.get("unite") or ""), reference), "valeur": valeur, "sql": calcul["sql"],
         })
         if len(kpi) == MAX_KPI:
             break
@@ -693,13 +746,14 @@ def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement:
         if type_graphique == "camembert" and (serie or len(lignes) > 6):
             type_graphique = "barres"
         graphiques.append({
-            "id": gid, "titre": str(p.get("titre") or calcul["question"]),
+            "id": gid, "titre": retirer_devises_inventees(str(p.get("titre") or calcul["question"]), reference),
             "question": calcul["question"], "pourquoi": calcul.get("pourquoi", ""), "famille": calcul.get("famille", ""),
             "type": type_graphique, "x": x, "y": y, "serie": serie,
-            "libelle_x": str(p.get("libelle_x") or x), "libelle_y": str(p.get("libelle_y") or y),
+            "libelle_x": str(p.get("libelle_x") or x),
+            "libelle_y": retirer_devises_inventees(str(p.get("libelle_y") or y), reference),
             "libelle_serie": str(p.get("libelle_serie") or serie) if serie else None,
             "effectif": "nb" if "nb" in colonnes else None,
-            "phrase": str(p.get("phrase") or ""), "sql": calcul["sql"],
+            "phrase": retirer_devises_inventees(str(p.get("phrase") or ""), reference), "sql": calcul["sql"],
             "resultat": _trier_si_ordonne({**calcul["resultat"], "lignes": lignes}, x, serie),
         })
         if len(graphiques) == MAX_GRAPHIQUES:
@@ -716,7 +770,7 @@ def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement:
         "kpi": kpi,
         "graphiques": graphiques,
         "filtres": filtres,
-        "conclusion": str(presentation.get("conclusion") or ""),
+        "conclusion": retirer_devises_inventees(str(presentation.get("conclusion") or ""), reference),
         "effectif_min": effectif_min,
     }
 
@@ -760,7 +814,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
         {"role": "system", "content": PROMPT_QUESTIONNER},
         {"role": "user", "content": json.dumps({
             "comprehension": comprehension, "colonnes_calculees": colonnes_calculees,
-            "classement_facteurs": classement, "fiche": fiche_compacte(fiche, avec_exemples=False),
+            "classement_facteurs": classement, "fiche": fiche_compacte(fiche, avec_exemples=False, budget_tokens=2000),
         }, ensure_ascii=False)},
     ]
     plan = _appeler_analyste(messages, "étape 2 (questionner)")
@@ -830,7 +884,9 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
     ], "étape 3 (présenter)")
 
     dashboard = valider_dashboard(comprehension, colonnes_calculees, classement,
-                                  kpi_calcules, graphiques_calcules, presentation, filtres, effectif_min)
+                                  kpi_calcules, graphiques_calcules, presentation, filtres, effectif_min,
+                                  reference=" ".join([fiche.get("titre") or "", fiche.get("description") or ""]
+                                                     + [c["nom"] for c in fiche["colonnes"]]))
     print(f"[ANALYSTE] ✓ Dashboard prêt : {len(dashboard['kpi'])} KPI, {len(dashboard['graphiques'])} graphiques, "
           f"{len(dashboard['filtres'])} filtres")
     return dashboard
