@@ -20,7 +20,8 @@ supabase = create_client(
     os.getenv("SUPABASE_SERVICE_KEY"),
 )
 
-MODELE = "openai/gpt-oss-20b"
+MODELE = "openai/gpt-oss-20b"               # suggestions de titre/catégorie et Atlas
+MODELE_ANALYSTE = "openai/gpt-oss-120b"     # l'Analyste : un autre modèle, donc un quota Groq séparé
 
 
 # ─── Lecture d'un échantillon du fichier ───────────────────────────────────────
@@ -438,7 +439,7 @@ def _appeler_analyste(messages: list[dict], etape: str) -> dict:
     while essai < 3:
         try:
             reponse = client.chat.completions.create(
-                model=MODELE,
+                model=MODELE_ANALYSTE,
                 messages=messages_envoyes,
                 max_tokens=MAX_TOKENS_REPONSE,
                 temperature=0.2,
