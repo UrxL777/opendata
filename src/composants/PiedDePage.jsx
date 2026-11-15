@@ -4,23 +4,23 @@ import LogOpenData from './LogOpenData'
 
 export default function PiedDePage() {
   return (
-    <footer className="bg-gray-900 text-gray-300 mt-16">
+    <footer className="bg-pied-de-page text-texte-pied-de-page mt-16">
       <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
 
         {/* Contact */}
         <div>
-          <h3 className="text-white font-semibold mb-3">Contact</h3>
+          <h3 className="text-texte-inverse font-semibold mb-3">Contact</h3>
           <ul className="space-y-2 text-sm">
             <li className="flex items-center gap-2">
-              <MapPin size={14} className="text-blue-400 shrink-0" />
+              <MapPin size={14} className="text-texte-bleu-doux shrink-0" />
               Abidjan, Côte d'Ivoire
             </li>
             <li className="flex items-center gap-2">
-              <Phone size={14} className="text-blue-400 shrink-0" />
+              <Phone size={14} className="text-texte-bleu-doux shrink-0" />
               +225 07 483 365 67 / +225 05 554 894 83
             </li>
             <li className="flex items-center gap-2">
-              <Mail size={14} className="text-blue-400 shrink-0" />
+              <Mail size={14} className="text-texte-bleu-doux shrink-0" />
               urielakpa777@gmail.com
             </li>
           </ul>
@@ -45,38 +45,38 @@ export default function PiedDePage() {
           <div className="mb-3">
             <LogOpenData tailleIcone={23} tailleTexte="1.1rem" couleurTexte="white" mode="sombre" />
           </div>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-texte-discret">
             Une plateforme communautaire pour partager et explorer des données ouvertes aux formats CSV, Excel et JSON.
           </p>
         </div>
 
         {/* Navigation */}
         <div>
-          <h3 className="text-white font-semibold mb-3">Navigation</h3>
+          <h3 className="text-texte-inverse font-semibold mb-3">Navigation</h3>
           <ul className="space-y-2 text-sm">
-            <li><Link to="/" className="hover:text-white">Accueil</Link></li>
-            <li><Link to="/donnees" className="hover:text-white">Données</Link></li>
-            <li><Link to="/visualisation" className="hover:text-white">Dashboards</Link></li>
+            <li><Link to="/" className="hover:text-texte-inverse">Accueil</Link></li>
+            <li><Link to="/donnees" className="hover:text-texte-inverse">Données</Link></li>
+            <li><Link to="/dashboards" className="hover:text-texte-inverse">Dashboards</Link></li>
           </ul>
         </div>
 
         {/* Catégories */}
         <div>
-          <h3 className="text-white font-semibold mb-3">Catégories</h3>
+          <h3 className="text-texte-inverse font-semibold mb-3">Catégories</h3>
           <ul className="space-y-2 text-sm">
-            <li><Link to="/donnees?categorie=1" className="hover:text-white">Économie</Link></li>
-            <li><Link to="/donnees?categorie=6" className="hover:text-white">Environnement</Link></li>
-            <li><Link to="/donnees?categorie=2" className="hover:text-white">Santé</Link></li>
-            <li><Link to="/donnees?categorie=3" className="hover:text-white">Éducation</Link></li>
-            <li><Link to="/donnees?categorie=7" className="hover:text-white">Démographie</Link></li>
-            <li><Link to="/donnees?categorie=8" className="hover:text-white">Sport</Link></li>
-            <li><Link to="/donnees?categorie=10" className="hover:text-white">Sécurité & Justice</Link></li>
+            <li><Link to="/donnees?categorie=1" className="hover:text-texte-inverse">Économie</Link></li>
+            <li><Link to="/donnees?categorie=6" className="hover:text-texte-inverse">Environnement</Link></li>
+            <li><Link to="/donnees?categorie=2" className="hover:text-texte-inverse">Santé</Link></li>
+            <li><Link to="/donnees?categorie=3" className="hover:text-texte-inverse">Éducation</Link></li>
+            <li><Link to="/donnees?categorie=7" className="hover:text-texte-inverse">Démographie</Link></li>
+            <li><Link to="/donnees?categorie=8" className="hover:text-texte-inverse">Sport</Link></li>
+            <li><Link to="/donnees?categorie=10" className="hover:text-texte-inverse">Sécurité & Justice</Link></li>
           </ul>
         </div>
 
       </div>
 
-      <div className="border-t border-gray-800 text-center py-4 text-xs text-gray-500">
+      <div className="border-t border-bordure-pied-de-page text-center py-4 text-xs text-texte-doux">
         © {new Date().getFullYear()} OpenData. Tous droits réservés.
       </div>
     </footer>

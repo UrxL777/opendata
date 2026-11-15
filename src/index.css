@@ -1,1 +1,88 @@
 @import "tailwindcss";
+
+/*
+  ─── LES COULEURS DU SITE ─────────────────────────────────────────────────────
+  Toutes les couleurs sont déclarées ICI, une seule fois, avec un nom qui dit à quoi elles servent.
+  Pour changer une couleur sur tout le site, on change seulement sa valeur ici.
+
+  Comment s'en servir dans le code : le nom après "--color-" devient une classe Tailwind.
+    --color-principal       →  bg-principal (fond)   text-principal (texte)   border-principal (bordure)
+    --color-texte-doux      →  text-texte-doux
+*/
+@theme static {
+  /* Zones précises */
+  --color-navbar: #ffffff;                  /* fond de la barre de navigation */
+  --color-bouton-publier: oklch(54.6% 0.245 262.881); /* #2563eb : bouton « Publier sur OpenData » */
+  --color-bouton-publier-survol: oklch(48.8% 0.243 264.376); /* #1d4ed8 : le même bouton au survol de la souris */
+  --color-pied-de-page: oklch(21% 0.034 264.665); /* #111827 : fond du pied de page */
+  --color-texte-pied-de-page: oklch(87.2% 0.01 258.338); /* #d1d5db : textes du pied de page */
+  --color-bordure-pied-de-page: oklch(27.8% 0.033 256.848); /* #1f2937 : ligne de séparation du pied de page */
+
+  /* Couleur principale (le bleu d'OpenData) : boutons, liens, icônes */
+  --color-principal: oklch(54.6% 0.245 262.881); /* #2563eb */
+  --color-principal-survol: oklch(48.8% 0.243 264.376); /* #1d4ed8 : boutons au survol */
+  --color-bleu-nuit: oklch(37.9% 0.146 265.522); /* #1e3a8a : pastille d'icône foncée */
+  --color-accent-doux: oklch(70.7% 0.165 254.624); /* #60a5fa : petits points animés, poignée au survol */
+
+  /* Fonds */
+  --color-fond: #ffffff;                    /* cartes, fenêtres, panneaux */
+  --color-fond-doux: oklch(98.5% 0.002 247.839); /* #f9fafb : fond de page, zones légèrement grisées */
+  --color-fond-gris: oklch(96.7% 0.003 264.542); /* #f3f4f6 : étiquettes, boutons secondaires au survol */
+  --color-fond-gris-moyen: oklch(92.8% 0.006 264.531); /* #e5e7eb : boutons désactivés, séparateurs épais */
+  --color-poignee: oklch(87.2% 0.01 258.338); /* #d1d5db : petite barre pour tirer un panneau (mobile) */
+  --color-indicateur-saisie: oklch(70.7% 0.022 261.325); /* #9ca3af : points « Atlas écrit… » */
+  --color-fond-bleu-clair: oklch(97% 0.014 254.604); /* #eff6ff : encadrés bleus (rapport de nettoyage…) */
+  --color-fond-bleu-pale: oklch(93.2% 0.032 255.585); /* #dbeafe : survol des zones bleu clair */
+  --color-fond-erreur: oklch(97.1% 0.013 17.38); /* #fef2f2 : encadré d'erreur */
+  --color-fond-erreur-survol: oklch(93.6% 0.032 17.717); /* #fee2e2 */
+  --color-voile: #000000;                   /* voile sombre derrière une fenêtre (avec transparence) */
+  --color-degrade-debut: oklch(97% 0.014 254.604); /* #eff6ff : dégradé de l'accueil */
+  --color-degrade-fin: #ffffff;
+
+  /* Textes */
+  --color-texte-titre: oklch(21% 0.034 264.665); /* #111827 : grands titres */
+  --color-texte: oklch(27.8% 0.033 256.848); /* #1f2937 : texte normal */
+  --color-texte-moyen: oklch(37.3% 0.034 259.733); /* #374151 */
+  --color-texte-secondaire: oklch(44.6% 0.03 256.802); /* #4b5563 */
+  --color-texte-doux: oklch(55.1% 0.027 264.364); /* #6b7280 : textes d'explication */
+  --color-texte-discret: oklch(70.7% 0.022 261.325); /* #9ca3af : petites indications, dates */
+  --color-texte-inverse: #ffffff;           /* texte sur un fond bleu ou sombre */
+  --color-texte-puce: oklch(80.9% 0.105 251.813); /* #93c5fd : puces des listes bleues */
+  --color-texte-bleu-doux: oklch(70.7% 0.165 254.624); /* #60a5fa */
+  --color-texte-bleu-vif: oklch(62.3% 0.214 259.815); /* #3b82f6 */
+  --color-texte-principal-fonce: oklch(48.8% 0.243 264.376); /* #1d4ed8 */
+  --color-texte-bleu-fonce: oklch(42.4% 0.199 265.638); /* #1e40af */
+  --color-texte-bleu-nuit: oklch(37.9% 0.146 265.522); /* #1e3a8a */
+  --color-texte-erreur-vif: oklch(63.7% 0.237 25.331); /* #ef4444 */
+  --color-texte-erreur: oklch(57.7% 0.245 27.325); /* #dc2626 */
+  --color-texte-erreur-fonce: oklch(50.5% 0.213 27.518); /* #b91c1c */
+  --color-texte-erreur-tres-fonce: oklch(44.4% 0.177 26.899); /* #991b1b */
+
+  /* Bordures */
+  --color-bordure-legere: oklch(96.7% 0.003 264.542); /* #f3f4f6 : séparations très discrètes */
+  --color-bordure: oklch(92.8% 0.006 264.531); /* #e5e7eb : bordure des cartes */
+  --color-bordure-champ: oklch(87.2% 0.01 258.338); /* #d1d5db : bordure des champs de formulaire */
+  --color-bordure-focus: oklch(62.3% 0.214 259.815); /* #3b82f6 : champ sélectionné */
+  --color-bordure-bleu-pale: oklch(93.2% 0.032 255.585); /* #dbeafe */
+  --color-bordure-bleu-clair: oklch(88.2% 0.059 254.128); /* #bfdbfe */
+  --color-bordure-bleu: oklch(80.9% 0.105 251.813); /* #93c5fd */
+  --color-bordure-bleu-doux: oklch(70.7% 0.165 254.624); /* #60a5fa */
+  --color-bordure-erreur: oklch(88.5% 0.062 18.334); /* #fecaca */
+  --color-bordure-erreur-forte: oklch(80.8% 0.114 19.571); /* #fca5a5 */
+
+  /* Graphiques des dashboards : le bleu d'OpenData en premier, puis des couleurs qui s'accordent avec lui.
+     Palette vérifiée : couleurs bien distinctes (aussi pour les daltoniens) et lisibles sur fond blanc. */
+  --color-graphique-1: oklch(54.6% 0.245 262.881); /* #2563eb : bleu OpenData */
+  --color-graphique-2: #0d9488;             /* vert d'eau */
+  --color-graphique-3: #7c3aed;             /* violet */
+  --color-graphique-4: #d97706;             /* ambre */
+  --color-graphique-5: #db2777;             /* rose */
+  --color-graphique-6: #0891b2;             /* cyan */
+  --color-graphique-grille: oklch(96.7% 0.003 264.542); /* #f3f4f6 : lignes de fond des graphiques */
+}
+
+/* Graphiques : pas de cadre noir autour d'une barre après un clic */
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible {
+  outline: none;
+}
