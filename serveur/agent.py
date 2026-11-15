@@ -671,6 +671,20 @@ def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement:
         if not lignes or x not in colonnes or y not in colonnes or x == y:
             print(f"[ANALYSTE] Graphique {gid} écarté : axes invalides ({x}, {y}) pour {colonnes}")
             continue
+
+        def numerique(colonne):
+            valeurs = [l[colonnes.index(colonne)] for l in lignes if l[colonnes.index(colonne)] is not None]
+            return bool(valeurs) and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in valeurs)
+
+        # La valeur (y) doit être un nombre ; si l'Analyste a inversé les axes, on les remet dans le bon sens
+        if not numerique(y):
+            if numerique(x):
+                x, y = y, x
+                lignes = [l for l in calcul["resultat"]["lignes"] if l[colonnes.index(x)] is not None]
+                p = {**p, "libelle_x": p.get("libelle_y"), "libelle_y": p.get("libelle_x")}
+            else:
+                print(f"[ANALYSTE] Graphique {gid} écarté : la valeur « {y} » n'est pas un nombre")
+                continue
         if serie not in colonnes or serie in (x, y):
             serie = None
         type_graphique = p.get("type") if p.get("type") in TYPES_GRAPHIQUES else "barres"
