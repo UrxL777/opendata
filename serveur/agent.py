@@ -660,6 +660,20 @@ def _classer_facteurs(chemin: str, comprehension: dict, colonnes_calculees: list
     return classement
 
 
+def mettre_en_forme_resultat(resultat: dict, x: str, serie: str | None) -> dict:
+    """
+    Prépare le résultat d'un graphique pour l'affichage : retire les catégories vides
+    (ex. une date illisible) et remet les tranches dans l'ordre. Sert au dashboard de base
+    ET aux résultats recalculés quand un visiteur filtre.
+    """
+    colonnes = resultat.get("colonnes") or []
+    lignes = resultat.get("lignes") or []
+    if x in colonnes:
+        lignes = [l for l in lignes if l[colonnes.index(x)] is not None]
+        return _trier_si_ordonne({**resultat, "lignes": lignes}, x, serie if serie in colonnes else None)
+    return {**resultat, "lignes": lignes}
+
+
 def _trier_si_ordonne(resultat: dict, x: str, serie: str | None) -> dict:
     """
     Remet dans l'ordre naturel les catégories ordonnées (tranches « 1. … », « 18-25 », mois « 2025-01 »…),
@@ -784,7 +798,7 @@ def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement:
             "libelle_serie": str(p.get("libelle_serie") or serie) if serie else None,
             "effectif": "nb" if "nb" in colonnes else None,
             "phrase": retirer_devises_inventees(str(p.get("phrase") or ""), reference), "sql": calcul["sql"],
-            "resultat": _trier_si_ordonne({**calcul["resultat"], "lignes": lignes}, x, serie),
+            "resultat": mettre_en_forme_resultat({**calcul["resultat"], "lignes": lignes}, x, serie),
         })
         if len(graphiques) == MAX_GRAPHIQUES:
             break
