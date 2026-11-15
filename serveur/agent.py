@@ -22,6 +22,33 @@ supabase = create_client(
 
 MODELE = "openai/gpt-oss-20b"               # suggestions de titre/catégorie et Atlas
 MODELE_ANALYSTE = "openai/gpt-oss-120b"     # l'Analyste : un autre modèle, donc un quota Groq séparé
+MODELE_SECOURS = "qwen/qwen3.8-27b"         # prend le relais si le quota du modèle principal est épuisé
+
+
+def _limite_ou_indisponible(erreur: Exception) -> bool:
+    """Vrai si Groq refuse à cause d'un quota épuisé, d'une demande trop grosse ou d'un modèle indisponible."""
+    message = str(erreur).lower()
+    return any(m in message for m in ("429", "413", "rate limit", "503", "over capacity", "model_decommissioned", "does not exist"))
+
+
+def completion_avec_secours(**parametres):
+    """
+    Appelle le modèle principal (MODELE). Si Groq refuse parce que son quota est épuisé,
+    la même demande est envoyée automatiquement au modèle de secours : l'utilisateur reçoit
+    quand même une réponse, sans rien voir.
+    """
+    try:
+        return client.chat.completions.create(model=MODELE, **parametres)
+    except Exception as e:
+        if not _limite_ou_indisponible(e):
+            raise
+        print(f"[SECOURS] Modèle principal indisponible ({str(e)[:120]}) → modèle de secours {MODELE_SECOURS}")
+        reponse = client.chat.completions.create(model=MODELE_SECOURS, **parametres)
+        # Certains modèles écrivent leur réflexion entre <think> et </think> : on ne garde que la réponse
+        message = reponse.choices[0].message
+        if message.content:
+            message.content = re.sub(r"<think>.*?</think>", "", message.content, flags=re.DOTALL).strip()
+        return reponse
 
 
 # ─── Lecture d'un échantillon du fichier ───────────────────────────────────────
@@ -119,7 +146,7 @@ def texte_dashboard(dashboard: dict) -> str:
     """Résume le dashboard de l'Analyste en texte, pour le contexte d'Atlas (avec les vrais chiffres)."""
     c = dashboard.get("comprehension") or {}
     lignes = [
-        "DASHBOARD AUTOMATIQUE (construit par l'Analyste ; tous les chiffres viennent de calculs sur le fichier complet) :",
+        "DASHBOARD AUTOMATIQUE (c'est toi, Atlas, qui l'as construit dans ton rôle d'analyste ; tous les chiffres viennent de calculs sur le fichier complet) :",
         f"- Sujet : {c.get('sujet', '')} Une ligne = {c.get('une_ligne_represente', '')}.",
         f"- Question centrale : {c.get('question_centrale', '')}",
         f"- Colonne principale étudiée : {c.get('colonne_principale', '')}",
@@ -276,8 +303,7 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
     liste_cats = "\n".join([f"- id {c['id']} : {c['nom']}" for c in categories])
 
     try:
-        reponse = client.chat.completions.create(
-            model=MODELE,
+        reponse = completion_avec_secours(
             messages=[
                 {
                     "role": "system",
@@ -416,7 +442,7 @@ def fiche_compacte(fiche: dict, avec_exemples: bool = True, budget_tokens: int =
 
 TYPES_GRAPHIQUES = {"barres", "barres_horizontales", "barres_groupees", "courbe", "camembert"}
 
-PROMPT_ANALYSTE_ROLE = """Tu es l'Analyste de la plateforme OpenData : un data analyst expérimenté qui construit automatiquement un dashboard pour chaque jeu de données publié.
+PROMPT_ANALYSTE_ROLE = """Tu es Atlas, l'assistant data analyst de la plateforme OpenData, dans ton rôle d'analyste : tu construis automatiquement un dashboard pour chaque jeu de données publié, comme un data analyst expérimenté.
 Tu ne vois jamais les données elles-mêmes : tu reçois leur fiche d'identité (colonnes, rôles, statistiques, lignes d'exemple). Tu écris des requêtes SQL (DuckDB) que le serveur exécute sur le fichier complet, puis tu interprètes les résultats.
 
 Règles générales :
@@ -914,13 +940,16 @@ def chat(jeu_id: str, messages: list[dict]) -> str:
     messages_envoyes = [{"role": "system", "content": prompt}] + messages_recents
     for essai in range(3):
         try:
-            reponse = client.chat.completions.create(
-                model=MODELE,
+            reponse = completion_avec_secours(
                 messages=messages_envoyes,
                 max_tokens=1500,
             )
-            resultat = reponse.choices[0].message.content
-            print(f"[CHAT] ✓ Réponse générée ({len(resultat or '')} chars, essai {essai + 1}) :\n{(resultat or '')[:300]}...")
+            resultat = reponse.choices[0].message.content or ""
+            # Les devises absentes du jeu de données sont retirées (sauf dans les blocs de code)
+            morceaux = resultat.split("```")
+            resultat = "```".join(retirer_devises_inventees(m, contexte) if i % 2 == 0 else m
+                                  for i, m in enumerate(morceaux))
+            print(f"[CHAT] ✓ Réponse générée ({len(resultat)} chars, essai {essai + 1}) :\n{resultat[:300]}...")
             return resultat
         except Exception as e:
             if "called a tool" in str(e) and essai < 2:

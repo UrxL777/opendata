@@ -8,9 +8,10 @@ create table if not exists public.dashboards (
   jeu_de_donnees_id bigint primary key
     references public.jeux_de_donnees (id) on delete cascade,
 
-  -- en_cours : l'Analyste travaille · termine : prêt · erreur : échec
-  statut text not null default 'en_cours'
-    check (statut in ('en_cours', 'termine', 'erreur')),
+  -- en_attente : dans la file d'attente · en_cours : Atlas (rôle d'analyste) travaille
+  -- termine : prêt · erreur : échec (un nouvel essai est fait automatiquement)
+  statut text not null default 'en_attente'
+    check (statut in ('en_attente', 'en_cours', 'termine', 'erreur')),
 
   -- La fiche d'identité du jeu de données propre (colonnes, rôles, statistiques…)
   fiche jsonb,
