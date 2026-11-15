@@ -14,7 +14,7 @@ def nettoyer_textes(df: pd.DataFrame) -> tuple[pd.DataFrame, list]:
         # Remplacer les chaînes vides par NaN
         df[col] = df[col].replace("", np.nan)
         if not df[col].equals(avant):
-            operations.append(f"Colonne '{col}' : espaces nettoyés, chaînes vides converties en NaN.")
+            operations.append(f"Colonne '{col}' : espaces en trop retirés, cases vides considérées comme manquantes.")
     return df, operations
 
 

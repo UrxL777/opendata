@@ -12,6 +12,18 @@ const texteLegende = valeur => <span style={{ color: 'var(--color-texte-secondai
 const COULEUR_GRILLE = 'var(--color-graphique-grille)'
 const COULEUR_TEXTE_AXE = 'var(--color-texte-doux)'
 
+// Fin de l'axe des valeurs : la plus petite valeur ronde égale ou juste au-dessus du maximum affiché
+// (note max 4,8 → 5 ; prix max 11 568 → 12 000), avec des graduations régulières faciles à lire.
+const VALEURS_RONDES = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
+function axeArrondi(maximum) {
+  if (!(maximum > 0)) return null
+  const ordre = 10 ** Math.floor(Math.log10(maximum))
+  const fin = VALEURS_RONDES.map(v => v * ordre).find(v => v >= maximum - 1e-9)
+  const pasRond = p => VALEURS_RONDES.some(v => Math.abs(p / 10 ** Math.floor(Math.log10(p)) - v) < 1e-9 && [1, 2, 2.5, 3, 5].includes(v))
+  const nombre = [5, 4, 6, 3].find(n => pasRond(fin / n)) ?? 4
+  return { domaine: [0, fin], graduations: Array.from({ length: nombre + 1 }, (_, i) => +(i * fin / nombre).toPrecision(12)) }
+}
+
 // Axe : 12 500 → « 12,5 k » ; 2 300 000 → « 2,3 M »
 function formaterAxe(v) {
   const n = Number(v)
@@ -173,6 +185,10 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
   const labelY = { value: graphique.libelle_y, angle: -90, position: 'insideLeft', style: { ...axeTexte, textAnchor: 'middle' } }
   const labelX = { value: graphique.libelle_x, position: 'insideBottom', offset: -18, style: axeTexte }
   const marges = { top: 8, right: 12, bottom: 34, left: 8 }
+  // Plus grande valeur affichée (toutes séries) et axe arrondi ; s'il y a des valeurs négatives, l'axe reste automatique
+  const valeurs = donnees.flatMap(d => (series.length ? series.map(s => d[`v_${s}`]) : [d.y])).filter(v => typeof v === 'number')
+  const axe = valeurs.length && Math.min(...valeurs) >= 0 ? axeArrondi(Math.max(...valeurs)) : null
+  const echelle = axe ? { domain: axe.domaine, ticks: axe.graduations, interval: 0 } : {}
   const hauteurAxeBas = 22 + (lignesBas - 1) * 14
 
   let rendu
@@ -193,7 +209,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
       <LineChart data={donnees} margin={marges}>
         <CartesianGrid stroke={COULEUR_GRILLE} vertical={false} />
         <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(v, 12)} label={labelX} padding={{ left: 24, right: 24 }} />
-        <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} />
+        <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} {...echelle} />
         {bulle}
         {series.length ? (
           <>
@@ -209,7 +225,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
     rendu = (
       <BarChart data={donnees} layout="vertical" margin={{ ...marges, left: 4 }}>
         <CartesianGrid stroke={COULEUR_GRILLE} horizontal={false} />
-        <XAxis type="number" tick={axeTexte} tickFormatter={formaterAxe} label={{ ...labelX, value: graphique.libelle_y }} />
+        <XAxis type="number" tick={axeTexte} tickFormatter={formaterAxe} label={{ ...labelX, value: graphique.libelle_y }} {...echelle} />
         <YAxis type="category" dataKey="x" tick={<GraduationGauche max={maxGauche} />} width={largeurGauche} interval={0} />
         {bulle}
         <Bar dataKey="y" name={graphique.libelle_y} onClick={cliquer} cursor={cliquable ? 'pointer' : undefined} radius={[0, 4, 4, 0]}>
@@ -223,7 +239,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
       <BarChart data={donnees} margin={marges}>
         <CartesianGrid stroke={COULEUR_GRILLE} vertical={false} />
         <XAxis dataKey="x" tick={<GraduationBas max={maxBas} />} interval={0} height={hauteurAxeBas} label={labelX} />
-        <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} />
+        <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} {...echelle} />
         {bulle}
         {series.length ? (
           <>
