@@ -4,9 +4,11 @@ import {
 } from 'recharts'
 import { formaterNombre } from '../../utilitaires/formatDashboard'
 
-// Les couleurs viennent de index.css (uniquement des bleus)
+// Les couleurs viennent de index.css : le bleu d'OpenData puis 5 couleurs qui s'accordent avec lui, toujours dans le même ordre
 const COULEURS = [1, 2, 3, 4, 5, 6].map(i => `var(--color-graphique-${i})`)
-const COULEUR_PETIT_GROUPE = 'var(--color-graphique-petit-groupe)'
+const OPACITE_PETIT_GROUPE = 0.3   // un groupe de moins de 30 lignes : la même couleur, en pâle
+// Légende : le petit carré porte la couleur, le texte reste dans la couleur du texte (plus lisible)
+const texteLegende = valeur => <span style={{ color: 'var(--color-texte-secondaire)' }}>{valeur}</span>
 const COULEUR_GRILLE = 'var(--color-graphique-grille)'
 const COULEUR_TEXTE_AXE = 'var(--color-texte-doux)'
 
@@ -124,12 +126,22 @@ function Bulle({ active, payload, label, graphique, effectifMin }) {
 }
 
 export default function GraphiqueDashboard({ graphique, resultat, numero, effectifMin = 30, filtres = [], onCliquerValeur, compact = false }) {
-  const { donnees, series } = preparerDonnees(graphique, resultat)
+  const preparees = preparerDonnees(graphique, resultat)
+  const donnees = preparees.donnees
+  // Une couleur par série, jamais deux fois la même : au-delà de 6, on garde les 6 séries qui ont le plus de lignes
+  const poidsSerie = s => preparees.donnees.reduce((a, d) => a + (d[`nb_${s}`] ?? (d[`v_${s}`] != null ? 1 : 0)), 0)
+  const series = preparees.series.length > COULEURS.length
+    ? [...preparees.series].sort((a, b) => poidsSerie(b) - poidsSerie(a)).slice(0, COULEURS.length)
+    : preparees.series
+  const seriesMasquees = preparees.series.length - series.length
   const plusLongNom = Math.max(0, ...donnees.map(d => String(d.x).length))
   // Des barres avec beaucoup de catégories ou des noms longs deviennent horizontales : les noms ont la place à gauche
-  const type = graphique.type === 'barres' && (donnees.length > (compact ? 5 : 8) || plusLongNom > (compact ? 10 : 16))
+  const type = graphique.type === 'barres' && (donnees.length > (compact ? 5 : 6) || plusLongNom > 10)
     ? 'barres_horizontales' : graphique.type
   const petit = nb => nb != null && nb < effectifMin
+  const opacite = nb => (petit(nb) ? OPACITE_PETIT_GROUPE : 1)
+  // Un graphique à une seule série prend sa propre couleur : graphique 1 en bleu, 2 en vert d'eau, etc.
+  const couleurGraphique = COULEURS[(numero - 1) % COULEURS.length]
 
   // Clic sur une barre = filtrer par cette valeur (si les barres sont les valeurs d'un filtre)
   const lien = onCliquerValeur ? filtreDuGraphique(filtres, donnees.map(d => d.x), graphique.x) : null
@@ -143,13 +155,13 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
   // Place pour les noms écrits sur plusieurs lignes
   const maxGauche = compact ? 13 : 20
   const lignesGauche = Math.max(1, ...donnees.map(d => couperEnLignes(d.x, maxGauche).length))
-  const largeurGauche = Math.min(compact ? 100 : 150, 14 + 7 * Math.max(...donnees.map(d => Math.max(...couperEnLignes(d.x, maxGauche).map(l => l.length))), 4))
-  const maxBas = Math.max(6, Math.floor((compact ? 300 : 520) / Math.max(1, donnees.length) / 7))
+  const largeurGauche = Math.min(compact ? 110 : 175, 22 + 7.8 * Math.max(...donnees.map(d => Math.max(...couperEnLignes(d.x, maxGauche).map(l => l.length))), 4))
+  const maxBas = Math.max(6, Math.floor((compact ? 280 : 420) / Math.max(1, donnees.length) / 8))
   const lignesBas = Math.max(1, ...donnees.map(d => couperEnLignes(d.x, maxBas).length))
 
   // Base du graphique : nombre de lignes utilisées (sauf croisement : chaque ligne compte une fois par série)
   const total = graphique.effectif && donnees.length
-    ? (series.length ? donnees.reduce((a, d) => a + series.reduce((b, s) => b + (d[`nb_${s}`] ?? 0), 0), 0)
+    ? (preparees.series.length ? donnees.reduce((a, d) => a + preparees.series.reduce((b, s) => b + (d[`nb_${s}`] ?? 0), 0), 0)
       : donnees.reduce((a, d) => a + (d.nb ?? 0), 0))
     : null
   const aPetitsGroupes = series.length
@@ -170,10 +182,10 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
     rendu = (
       <PieChart>
         <Pie data={donnees} dataKey="y" nameKey="x" outerRadius="75%" onClick={cliquer} cursor={cliquable ? 'pointer' : undefined}>
-          {donnees.map((d, i) => <Cell key={i} fill={petit(d.nb) ? COULEUR_PETIT_GROUPE : COULEURS[i % COULEURS.length]} />)}
+          {donnees.map((d, i) => <Cell key={i} fill={COULEURS[i % COULEURS.length]} fillOpacity={opacite(d.nb)} />)}
         </Pie>
         {bulle}
-        <Legend wrapperStyle={{ fontSize: 12 }} />
+        <Legend wrapperStyle={{ fontSize: 12 }} formatter={texteLegende} />
       </PieChart>
     )
   } else if (type === 'courbe') {
@@ -185,11 +197,11 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
         {bulle}
         {series.length ? (
           <>
-            <Legend verticalAlign="top" wrapperStyle={{ fontSize: 12 }} />
-            {series.map((s, i) => <Line key={s} name={s} dataKey={`v_${s}`} stroke={COULEURS[i % COULEURS.length]} strokeWidth={2} dot={{ r: 3 }} />)}
+            <Legend verticalAlign="top" wrapperStyle={{ fontSize: 12 }} formatter={texteLegende} />
+            {series.map((s, i) => <Line key={s} name={s} dataKey={`v_${s}`} stroke={COULEURS[i % COULEURS.length]} strokeWidth={2} dot={{ r: 4, fill: COULEURS[i % COULEURS.length] }} />)}
           </>
         ) : (
-          <Line dataKey="y" name={graphique.libelle_y} stroke={COULEURS[1]} strokeWidth={2} dot={{ r: 3 }} />
+          <Line dataKey="y" name={graphique.libelle_y} stroke={couleurGraphique} strokeWidth={2} dot={{ r: 4, fill: couleurGraphique }} />
         )}
       </LineChart>
     )
@@ -201,7 +213,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
         <YAxis type="category" dataKey="x" tick={<GraduationGauche max={maxGauche} />} width={largeurGauche} interval={0} />
         {bulle}
         <Bar dataKey="y" name={graphique.libelle_y} onClick={cliquer} cursor={cliquable ? 'pointer' : undefined} radius={[0, 4, 4, 0]}>
-          {donnees.map((d, i) => <Cell key={i} fill={petit(d.nb) ? COULEUR_PETIT_GROUPE : COULEURS[1]} />)}
+          {donnees.map((d, i) => <Cell key={i} fill={couleurGraphique} fillOpacity={opacite(d.nb)} />)}
         </Bar>
       </BarChart>
     )
@@ -215,16 +227,16 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
         {bulle}
         {series.length ? (
           <>
-            <Legend verticalAlign="top" wrapperStyle={{ fontSize: 12 }} />
+            <Legend verticalAlign="top" wrapperStyle={{ fontSize: 12 }} formatter={texteLegende} />
             {series.map((s, i) => (
-              <Bar key={s} name={s} dataKey={`v_${s}`} onClick={cliquer} cursor={cliquable ? 'pointer' : undefined} radius={[4, 4, 0, 0]}>
-                {donnees.map((d, j) => <Cell key={j} fill={petit(d[`nb_${s}`]) ? COULEUR_PETIT_GROUPE : COULEURS[i % COULEURS.length]} />)}
+              <Bar key={s} name={s} dataKey={`v_${s}`} fill={COULEURS[i % COULEURS.length]} onClick={cliquer} cursor={cliquable ? 'pointer' : undefined} radius={[4, 4, 0, 0]}>
+                {donnees.map((d, j) => <Cell key={j} fill={COULEURS[i % COULEURS.length]} fillOpacity={opacite(d[`nb_${s}`])} />)}
               </Bar>
             ))}
           </>
         ) : (
           <Bar dataKey="y" name={graphique.libelle_y} onClick={cliquer} cursor={cliquable ? 'pointer' : undefined} radius={[4, 4, 0, 0]}>
-            {donnees.map((d, i) => <Cell key={i} fill={petit(d.nb) ? COULEUR_PETIT_GROUPE : COULEURS[1]} />)}
+            {donnees.map((d, i) => <Cell key={i} fill={couleurGraphique} fillOpacity={opacite(d.nb)} />)}
           </Bar>
         )}
       </BarChart>
@@ -245,6 +257,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
         {total && aPetitsGroupes ? ' · ' : ''}
         {aPetitsGroupes ? `barre pâle : groupe de moins de ${effectifMin} lignes` : ''}
         {cliquable ? `${total || aPetitsGroupes ? ' · ' : ''}clique sur une barre pour filtrer` : ''}
+        {seriesMasquees > 0 ? ` · les ${series.length} séries les plus fréquentes sont affichées (${seriesMasquees} autre${seriesMasquees > 1 ? 's' : ''} non affichée${seriesMasquees > 1 ? 's' : ''})` : ''}
       </p>
     </div>
   )

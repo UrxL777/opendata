@@ -557,7 +557,7 @@ Règles SQL (DuckDB) :
 - Pour chaque groupe, ajoute TOUJOURS une colonne nb = COUNT(*).
 - Arrondis : ROUND(..., 0) pour les montants, ROUND(..., 1) pour les pourcentages et les petites valeurs.
 - Trie les résultats de façon lisible (ordre des tranches, ou du plus grand au plus petit).
-- Pour un croisement : une ligne par combinaison, avec le facteur 1, le facteur 2, la valeur et nb.
+- Pour un croisement : une ligne par combinaison, avec le facteur 1, le facteur 2, la valeur et nb. Le facteur 2 (celui des séries) a au plus 5 groupes : choisis un facteur qui a peu de groupes, ou une version regroupée.
 - Si la colonne principale est catégorielle, la valeur étudiée est le pourcentage de la valeur cible : ROUND(100.0 * AVG(CASE WHEN "colonne" = 'valeur' THEN 1 ELSE 0 END), 1) AS pct_valeur.
 - Ne parle jamais du fichier lui-même (lignes supprimées, valeurs manquantes) : c'est le rôle du rapport de nettoyage.
 

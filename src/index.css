@@ -56,7 +56,9 @@
   --color-texte-erreur-vif: oklch(63.7% 0.237 25.331); /* #ef4444 */
   --color-texte-erreur: oklch(57.7% 0.245 27.325); /* #dc2626 */
   --color-texte-erreur-fonce: oklch(50.5% 0.213 27.518); /* #b91c1c */
-  --color-texte-erreur-tres-fonce: oklch(44.4% 0.177 26.899); /* #991b1b : Bordures */
+  --color-texte-erreur-tres-fonce: oklch(44.4% 0.177 26.899); /* #991b1b */
+
+  /* Bordures */
   --color-bordure-legere: oklch(96.7% 0.003 264.542); /* #f3f4f6 : séparations très discrètes */
   --color-bordure: oklch(92.8% 0.006 264.531); /* #e5e7eb : bordure des cartes */
   --color-bordure-champ: oklch(87.2% 0.01 258.338); /* #d1d5db : bordure des champs de formulaire */
@@ -66,14 +68,16 @@
   --color-bordure-bleu: oklch(80.9% 0.105 251.813); /* #93c5fd */
   --color-bordure-bleu-doux: oklch(70.7% 0.165 254.624); /* #60a5fa */
   --color-bordure-erreur: oklch(88.5% 0.062 18.334); /* #fecaca */
-  --color-bordure-erreur-forte: oklch(80.8% 0.114 19.571); /* #fca5a5 : Graphiques des dashboards (uniquement des bleus) */
-  --color-graphique-1: oklch(42.4% 0.199 265.638); /* #1e40af */
-  --color-graphique-2: oklch(62.3% 0.214 259.815); /* #3b82f6 */
-  --color-graphique-3: oklch(80.9% 0.105 251.813); /* #93c5fd */
-  --color-graphique-4: oklch(48.8% 0.243 264.376); /* #1d4ed8 */
-  --color-graphique-5: oklch(70.7% 0.165 254.624); /* #60a5fa */
-  --color-graphique-6: oklch(88.2% 0.059 254.128); /* #bfdbfe */
-  --color-graphique-petit-groupe: oklch(93.2% 0.032 255.585); /* #dbeafe : barre pâle : groupe de moins de 30 lignes */
+  --color-bordure-erreur-forte: oklch(80.8% 0.114 19.571); /* #fca5a5 */
+
+  /* Graphiques des dashboards : le bleu d'OpenData en premier, puis des couleurs qui s'accordent avec lui.
+     Palette vérifiée : couleurs bien distinctes (aussi pour les daltoniens) et lisibles sur fond blanc. */
+  --color-graphique-1: oklch(54.6% 0.245 262.881); /* #2563eb : bleu OpenData */
+  --color-graphique-2: #0d9488;             /* vert d'eau */
+  --color-graphique-3: #7c3aed;             /* violet */
+  --color-graphique-4: #d97706;             /* ambre */
+  --color-graphique-5: #db2777;             /* rose */
+  --color-graphique-6: #0891b2;             /* cyan */
   --color-graphique-grille: oklch(96.7% 0.003 264.542); /* #f3f4f6 : lignes de fond des graphiques */
 }
 
