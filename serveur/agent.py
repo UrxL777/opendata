@@ -78,7 +78,7 @@ def prompt_systeme(contexte: str) -> str:
 
 Ta personnalité :
 - Tu es chaleureux, bienveillant et naturel, comme un collègue data analyst qui aide un étudiant. Tu donnes envie de continuer la conversation.
-- Tu ne fais PAS l'analyse à la place de l'utilisateur : tu expliques, tu conseilles et tu orientes.
+- Tu ne fais PAS de nouvelle analyse à la place de l'utilisateur : tu expliques, tu conseilles et tu orientes. En revanche, tu expliques volontiers le dashboard automatique décrit dans le contexte, comme l'analyste qui l'a construit.
 - Tu réponds dans la langue de l'utilisateur (français par défaut) et tu le TUTOIES toujours, jamais de « vous ».
 
 Comment réagir selon la situation :
@@ -86,6 +86,7 @@ Comment réagir selon la situation :
   Exemple : « Salut ! Content de t'aider à explorer ce jeu de données. Tu peux par exemple me demander : … » suivi de 3 questions en liste.
 - Question sur toi (qui es-tu, que fais-tu…) : seulement dans ce cas, tu te présentes : tu es Atlas, l'assistant d'OpenData qui aide à comprendre et analyser les jeux de données de la plateforme.
 - Remerciement ou message court (merci, ok, d'accord…) : tu réponds simplement et poliment, en une phrase, et tu proposes de continuer. Pas de code.
+- Question sur le dashboard, un graphique, un indicateur ou un facteur (« que montre le graphique 2 ? », « pourquoi les fumeurs paient plus ? », « quel facteur compte le plus ? ») : tu réponds avec les VRAIS chiffres du dashboard donnés dans le contexte, en langage simple. Tu expliques ce que montre le graphique, ce qu'il faut en retenir, et sa limite éventuelle (un groupe de moins de 30 lignes est peu fiable ; un lien entre deux colonnes ne prouve pas une cause). Les graphiques sont numérotés dans l'ordre d'affichage (graphique 1, graphique 2…). Si la réponse n'est pas dans le dashboard, dis-le honnêtement et propose comment la trouver. Pas de code, sauf si on te le demande.
 - Question sur les données ou sur une analyse : tu réponds d'abord en une ou deux phrases simples, en langage naturel, qui répondent directement à la question (quelle méthode et pourquoi). Ensuite seulement, tu proposes : « Veux-tu que je te montre comment le faire en Python ? »
 - Demande de code, ou réponse positive à ta proposition (oui, vas-y, montre-moi…) : tu donnes le code.
 - Demande d'explication (je ne comprends pas, explique…) : tu expliques avec des mots simples, pas à pas, sans redonner tout le code.
@@ -112,6 +113,38 @@ Contexte du jeu de données :
 
 # ─── Construction du contexte à partir de la base ─────────────────────────────
 
+def texte_dashboard(dashboard: dict) -> str:
+    """Résume le dashboard de l'Analyste en texte, pour le contexte d'Atlas (avec les vrais chiffres)."""
+    c = dashboard.get("comprehension") or {}
+    lignes = [
+        "DASHBOARD AUTOMATIQUE (construit par l'Analyste ; tous les chiffres viennent de calculs sur le fichier complet) :",
+        f"- Sujet : {c.get('sujet', '')} Une ligne = {c.get('une_ligne_represente', '')}.",
+        f"- Question centrale : {c.get('question_centrale', '')}",
+        f"- Colonne principale étudiée : {c.get('colonne_principale', '')}",
+    ]
+    for col in dashboard.get("colonnes_calculees") or []:
+        lignes.append(f"- Colonne calculée « {col['nom']} » : {col.get('explication', '')}")
+    if dashboard.get("classement_facteurs"):
+        lignes.append("- Classement des facteurs (écart de la colonne principale entre le groupe le plus haut et le plus bas) : " + " ; ".join(
+            f"{f['facteur']} = {f['ecart']} (le plus haut : {f['groupe_le_plus_haut']} {f['valeur_haute']}, le plus bas : {f['groupe_le_plus_bas']} {f['valeur_basse']})"
+            + ("" if f.get("important") else ", peu important")
+            for f in dashboard["classement_facteurs"]))
+    for k in dashboard.get("kpi") or []:
+        lignes.append(f"- Indicateur « {k['titre']} » : {k['valeur']} {k.get('unite', '')}".rstrip())
+    for i, g in enumerate(dashboard.get("graphiques") or [], 1):
+        res = g.get("resultat") or {}
+        donnees = "; ".join(
+            ", ".join(f"{nom}={val}" for nom, val in zip(res.get("colonnes", []), ligne))
+            for ligne in (res.get("lignes") or [])[:20])
+        lignes.append(f"- Graphique {i} « {g['titre']} » ({g['type']}) : répond à « {g.get('question', '')} ». "
+                      f"Données : {donnees}. Conclusion affichée : {g.get('phrase', '')}")
+    if dashboard.get("filtres"):
+        lignes.append("- Filtres disponibles : " + ", ".join(f["colonne"] for f in dashboard["filtres"]))
+    if dashboard.get("conclusion"):
+        lignes.append(f"- Conclusion générale : {dashboard['conclusion']}")
+    return "\n".join(lignes)
+
+
 def construire_contexte(jeu_id: str) -> str:
     """Récupère les infos du jeu de données et le rapport d'analyse depuis Supabase."""
     print(f"[AGENT] construire_contexte : jeu_id={jeu_id}")
@@ -136,12 +169,13 @@ def construire_contexte(jeu_id: str) -> str:
         rapport = {}
         apercu = []
         try:
-            if fichiers:
-                fichier_id = fichiers[0]["id"]
-                print(f"[AGENT] Recherche analyse pour fichier_id={fichier_id}")
+            # Le rapport est rangé sous le numéro du JEU de données (voir main.py) ;
+            # les anciens rapports pouvaient l'être sous le numéro du fichier.
+            identifiants = [jeu_id] + ([fichiers[0]["id"]] if fichiers else [])
+            for identifiant in identifiants:
                 rep_analyse = supabase.table("analyses") \
                     .select("resultats") \
-                    .eq("fichier_id", fichier_id) \
+                    .eq("fichier_id", identifiant) \
                     .eq("statut", "termine") \
                     .maybe_single() \
                     .execute()
@@ -151,10 +185,27 @@ def construire_contexte(jeu_id: str) -> str:
                     rapport = resultats.get("inspection") or resultats.get("rapport", {})
                     apercu = resultats.get("apercu", [])
                     print(f"[AGENT] Rapport trouvé : {rapport.get('nb_lignes')} lignes × {rapport.get('nb_colonnes')} colonnes | {len(apercu)} lignes d'aperçu")
-                else:
-                    print(f"[AGENT] Aucun rapport d'analyse disponible")
+                    break
+            else:
+                print(f"[AGENT] Aucun rapport d'analyse disponible")
         except Exception as e:
             print(f"[AGENT] ✗ Erreur récupération analyse : {e}")
+
+        # Le dashboard automatique de l'Analyste, pour qu'Atlas puisse l'expliquer
+        texte_dash = ""
+        try:
+            rep_dash = supabase.table("dashboards") \
+                .select("statut, contenu") \
+                .eq("jeu_de_donnees_id", jeu_id) \
+                .maybe_single() \
+                .execute()
+            if rep_dash is not None and rep_dash.data:
+                if rep_dash.data.get("statut") == "termine" and rep_dash.data.get("contenu"):
+                    texte_dash = texte_dashboard(rep_dash.data["contenu"])
+                elif rep_dash.data.get("statut") == "en_cours":
+                    texte_dash = "Le dashboard automatique de ce jeu de données est en cours de préparation."
+        except Exception as e:
+            print(f"[AGENT] ✗ Erreur récupération dashboard : {e}")
 
         lignes = [
             f"Jeu de données : {jeu.get('titre', 'Sans titre')}",
@@ -188,6 +239,9 @@ def construire_contexte(jeu_id: str) -> str:
                 f"\nAperçu des premières lignes :\n"
                 f"{json.dumps(apercu, ensure_ascii=False, indent=2)}"
             )
+
+        if texte_dash:
+            lignes.append("\n" + texte_dash)
 
         contexte = "\n".join(lignes)
         print(f"[AGENT] Contexte construit ({len(contexte)} chars)")
