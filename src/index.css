@@ -9,7 +9,7 @@
     --color-principal       →  bg-principal (fond)   text-principal (texte)   border-principal (bordure)
     --color-texte-doux      →  text-texte-doux
 */
-@theme {
+@theme static {
   /* Zones précises */
   --color-navbar: #ffffff;                  /* fond de la barre de navigation */
   --color-bouton-publier: oklch(54.6% 0.245 262.881); /* #2563eb : bouton « Publier sur OpenData » */
