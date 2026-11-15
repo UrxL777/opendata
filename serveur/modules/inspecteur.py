@@ -240,7 +240,7 @@ def _type_simple(serie: pd.Series) -> str:
     return "texte"
 
 
-def fiche_identite(df: pd.DataFrame, titre: str = "", description: str = "") -> dict:
+def fiche_identite(df: pd.DataFrame, titre: str = "", description: str = "", roles_imposes: dict | None = None) -> dict:
     """
     Décrit le jeu de données PROPRE pour l'Analyste, sans lui donner les données elles-mêmes.
     Pour chaque colonne : son type, son rôle et des statistiques adaptées à ce rôle.
@@ -251,7 +251,8 @@ def fiche_identite(df: pd.DataFrame, titre: str = "", description: str = "") -> 
 
     for nom in df.columns:
         serie = df[nom]
-        role = _role_colonne_propre(serie, nom)
+        # Un rôle corrigé par Atlas au nettoyage (et accepté par le serveur) remplace celui deviné par Python
+        role = (roles_imposes or {}).get(str(nom)) or _role_colonne_propre(serie, nom)
         nb_manquants = int(serie.isna().sum())
         info = {
             "nom": str(nom),

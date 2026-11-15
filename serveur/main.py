@@ -15,7 +15,8 @@ from modules.nettoyeur import nettoyer
 from modules.rapport import generer_rapport
 from modules.comparateur import comparer, memes_colonnes
 from modules.requetes import executer_requete
-from agent import suggerer as agent_suggerer, chat as agent_chat, analyser_dataset, mettre_en_forme_resultat
+from agent import suggerer as agent_suggerer, chat as agent_chat, analyser_dataset, mettre_en_forme_resultat, \
+    choisir_traitement_manquants, base_du_kpi
 
 load_dotenv()
 
@@ -129,7 +130,14 @@ def _creer_dashboard(jeu_id: str) -> None:
         raise ValueError("Jeu de données propre introuvable.")
     infos = (jeu.data if jeu and jeu.data else {}) or {}
     chemin_local = _fichier_propre_local(jeu_id, ligne.data["chemin_propre"])
-    fiche = fiche_identite(pd.read_parquet(chemin_local), infos.get("titre") or "", infos.get("description") or "")
+    # Les rôles corrigés par Atlas au nettoyage sont repris ici (enregistrés avec le rapport)
+    roles_atlas = {}
+    try:
+        analyse = supabase.table("analyses").select("resultats").eq("fichier_id", jeu_id).maybe_single().execute()
+        roles_atlas = ((((analyse.data if analyse else None) or {}).get("resultats") or {}).get("rapport") or {}).get("roles_atlas") or {}
+    except Exception:
+        pass
+    fiche = fiche_identite(pd.read_parquet(chemin_local), infos.get("titre") or "", infos.get("description") or "", roles_atlas)
     dashboard = analyser_dataset(fiche, chemin_local)
     _maj_dashboard(jeu_id, statut="termine", fiche=_nettoyer_nan(fiche), contenu=_nettoyer_nan(dashboard), erreur=None)
     print(f"[DASHBOARD] ✓ Jeu {jeu_id} : dashboard enregistré")
@@ -346,8 +354,23 @@ async def analyser(
         df = lire_fichier(chemin_tmp, fichier.filename)
         print(f"[ANALYSER] DataFrame chargé : {df.shape}")
 
-        nettoyage = nettoyer(df, inspection["colonnes"])
+        # Atlas décide du traitement des cases vides à partir de la fiche d'identité (titre et description aident)
+        infos_jeu = {}
+        if fichier_id_existant or fichier_id:
+            try:
+                rep = supabase.table("jeux_de_donnees").select("titre, description") \
+                    .eq("id", fichier_id_existant or fichier_id).maybe_single().execute()
+                infos_jeu = (rep.data if rep else None) or {}
+            except Exception:
+                pass
+
+        def decision_atlas(df_presque_propre):
+            fiche = fiche_identite(df_presque_propre, infos_jeu.get("titre") or fichier.filename, infos_jeu.get("description") or "")
+            return choisir_traitement_manquants(fiche)
+
+        nettoyage = nettoyer(df, inspection["colonnes"], decision_atlas)
         rapport = generer_rapport(inspection, nettoyage)
+        rapport["roles_atlas"] = nettoyage.get("roles_atlas") or {}  # repris par le dashboard
 
         resultats = {
             "inspection": inspection,
@@ -582,7 +605,8 @@ def filtrer_dashboard(requete: RequeteFiltre):
     kpi = []
     for k in contenu.get("kpi") or []:
         r = executer_requete(chemin, k["sql"], filtres, colonnes_calculees)
-        kpi.append({"id": k["id"], "valeur": r["lignes"][0][0] if r["ok"] and r["lignes"] else None})
+        kpi.append({"id": k["id"], "valeur": r["lignes"][0][0] if r["ok"] and r["lignes"] else None,
+                    **base_du_kpi(chemin, k.get("colonne"), filtres, colonnes_calculees)})
 
     graphiques = []
     for g in contenu.get("graphiques") or []:

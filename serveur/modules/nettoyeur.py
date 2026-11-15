@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from dateutil import parser as dateutil_parser
-from modules.inspecteur import convertir_en_dates
+from modules.inspecteur import convertir_en_dates, proportion_de_dates, SEUIL_DATES
 
 # ─── Corrections automatiques sûres (catégorie 1) ──────────────────────────────
 
@@ -62,37 +62,128 @@ def convertir_dates(df: pd.DataFrame, colonnes_inspection: list) -> tuple[pd.Dat
     return df, operations
 
 
-def imputer_valeurs_manquantes(df: pd.DataFrame, colonnes_inspection: list) -> tuple[pd.DataFrame, list]:
+# Le « menu » : les seules actions qu'Atlas a le droit de choisir pour les cases vides d'une colonne.
+# Atlas décide (il comprend le sens des colonnes), Python vérifie puis applique.
+ACTIONS_MANQUANTS = ("laisser_vide", "mediane", "moyenne", "mode")
+MAX_PCT_IMPUTATION = 40  # au-delà, remplir reviendrait à inventer une trop grande partie de la colonne
+
+
+def _choix_controle(col: str, choix: dict, role: str, numerique: bool, pct: float,
+                    colonne_principale: str | None) -> tuple[str, str]:
+    """Rend l'action finale et, si le code a refusé le choix d'Atlas, la règle appliquée."""
+    action = choix.get("action")
+    if action not in ACTIONS_MANQUANTS:
+        return "laisser_vide", "choix hors menu"
+    if action == "laisser_vide":
+        return action, ""
+    if col == colonne_principale:
+        return "laisser_vide", "la colonne principale n'est jamais remplie"
+    if role in ("date", "identifiant", "texte_libre"):
+        return "laisser_vide", "une date, un identifiant ou un texte libre n'est jamais rempli"
+    if action in ("mediane", "moyenne") and not numerique:
+        return "laisser_vide", "médiane et moyenne seulement pour des nombres"
+    if pct > MAX_PCT_IMPUTATION:
+        return "laisser_vide", f"plus de {MAX_PCT_IMPUTATION} % de cases vides"
+    return action, ""
+
+
+ROLES_POSSIBLES = ("quantitative", "categorielle", "date", "identifiant", "texte_libre")
+NOMS_ROLES = {"quantitative": "quantitative (des nombres à calculer)", "categorielle": "catégorielle (des groupes)",
+              "date": "date", "identifiant": "identifiant", "texte_libre": "texte libre"}
+
+
+def corriger_roles(df: pd.DataFrame, colonnes_inspection: list, decision: dict | None) -> tuple[pd.DataFrame, list, dict]:
     """
-    Impute les valeurs manquantes selon le type de colonne.
-    - Quantitative : médiane (résistante aux valeurs atypiques)
-    - Catégorielle : mode (valeur la plus fréquente)
-    - Identifiant / texte libre / date : on ne touche pas
+    Applique les corrections de rôle proposées par Atlas (decision["roles_corriges"] = {nom: {"role", "raison"}}),
+    après vérification par Python. Met à jour colonnes_inspection et rend les rôles acceptés.
+    """
+    operations, acceptes = [], {}
+    corrections = (decision or {}).get("roles_corriges") or {}
+    if not isinstance(corrections, dict):
+        return df, operations, acceptes
+    infos = {c["nom"]: c for c in colonnes_inspection}
+
+    for col, choix in corrections.items():
+        if col not in df.columns or not isinstance(choix, dict):
+            continue
+        nouveau, ancien = choix.get("role"), infos.get(col, {}).get("role_estime", "inconnu")
+        if nouveau not in ROLES_POSSIBLES or nouveau == ancien:
+            continue
+        refus = ""
+        if pd.api.types.is_datetime64_any_dtype(df[col]) and nouveau != "date":
+            refus = "la colonne a déjà été reconnue comme date"
+        elif nouveau == "quantitative" and not pd.api.types.is_numeric_dtype(df[col]):
+            refus = "la colonne ne contient pas que des nombres"
+        elif nouveau == "date" and not pd.api.types.is_datetime64_any_dtype(df[col]):
+            if proportion_de_dates(df[col]) < SEUIL_DATES:
+                refus = f"moins de {int(SEUIL_DATES * 100)} % des valeurs sont des dates"
+            else:
+                df[col] = convertir_en_dates(df[col])
+        raison = str(choix.get("raison") or "").strip()
+        if refus:
+            operations.append(f"Colonne '{col}' : Atlas proposait le rôle « {NOMS_ROLES[nouveau]} », "
+                              f"refusé par le serveur ({refus}).")
+            continue
+        if col in infos:
+            infos[col]["role_estime"] = nouveau
+        acceptes[col] = nouveau
+        operations.append(f"Colonne '{col}' : rôle corrigé par Atlas, {NOMS_ROLES.get(ancien, ancien)} → "
+                          f"{NOMS_ROLES[nouveau]}." + (f" Atlas : {raison}" if raison else ""))
+    return df, operations, acceptes
+
+
+def imputer_valeurs_manquantes(df: pd.DataFrame, colonnes_inspection: list, decision: dict | None = None) -> tuple[pd.DataFrame, list]:
+    """
+    Traite les cases vides selon la décision d'Atlas (decision = {"colonne_principale": ..., "colonnes": {nom: {"action", "raison"}}}).
+    Sans décision (Atlas indisponible), rien n'est rempli : on n'invente aucune valeur.
     """
     operations = []
-    for col_info in colonnes_inspection:
-        col = col_info["nom"]
-        if col not in df.columns:
+    decision = decision or {}
+    choix_atlas = decision.get("colonnes") or {}
+    colonne_principale = decision.get("colonne_principale")
+    roles = {c["nom"]: c["role_estime"] for c in colonnes_inspection}
+    nb_lignes = len(df)
+
+    for col in df.columns:
+        nb_manquants = int(df[col].isna().sum())
+        if nb_manquants == 0:
             continue
-        if col_info["pct_manquants"] == 0:
-            continue
+        pct = round(nb_manquants / nb_lignes * 100, 1) if nb_lignes else 0
+        debut = f"Colonne '{col}' : {nb_manquants} valeur(s) manquante(s) ({pct} %)"
+        choix = choix_atlas.get(col) if isinstance(choix_atlas.get(col), dict) else {}
+        raison = str(choix.get("raison") or "").strip()
+        action, regle = _choix_controle(col, choix, roles.get(col, ""), pd.api.types.is_numeric_dtype(df[col]),
+                                        pct, colonne_principale)
 
-        role = col_info["role_estime"]
-        nb_manquants = col_info["nb_manquants"]
+        valeur = None
+        if action == "mediane":
+            valeur = df[col].median()
+        elif action == "moyenne":
+            valeur = df[col].mean()
+        elif action == "mode" and df[col].notna().any():
+            valeur = df[col].mode()[0]
+        if valeur is None or (isinstance(valeur, float) and np.isnan(valeur)):
+            action = "laisser_vide"
 
-        if role == "quantitative":
-            mediane = df[col].median()
-            df[col] = df[col].fillna(mediane)
-            operations.append(f"Colonne '{col}' ({nb_manquants} manquants) : imputée avec la médiane ({round(mediane, 2)}).")
-
-        elif role == "categorielle":
-            if df[col].notna().any():
-                mode = df[col].mode()[0]
-                df[col] = df[col].fillna(mode)
-                operations.append(f"Colonne '{col}' ({nb_manquants} manquants) : imputée avec le mode ('{mode}').")
-
+        if action == "laisser_vide":
+            message = f"{debut}, laissée(s) vide(s) : elle(s) ne compte(nt) pas dans les calculs."
         else:
-            operations.append(f"Colonne '{col}' ({nb_manquants} manquants, rôle : {role}) : conservée sans imputation.")
+            if isinstance(valeur, (float, np.floating)):
+                valeur = round(float(valeur), 2)
+            df[col] = df[col].fillna(valeur)
+            nom_action = {"mediane": "la médiane", "moyenne": "la moyenne", "mode": "la valeur la plus fréquente"}[action]
+            message = f"{debut}, remplie(s) avec {nom_action} ('{valeur}')."
+
+        if not decision:
+            message += " Décision par défaut : Atlas n'a pas pu être consulté."
+        elif not choix:
+            message += " Décision par défaut : Atlas ne s'est pas prononcé sur cette colonne."
+        else:
+            if raison:
+                message += f" Atlas : {raison}"
+            if regle:
+                message += f" (Atlas proposait « {choix.get('action')} », refusé par le serveur : {regle}.)"
+        operations.append(message)
 
     return df, operations
 
@@ -130,9 +221,11 @@ def detecter_anomalies(df: pd.DataFrame, colonnes_inspection: list) -> list:
 
 # ─── Point d'entrée principal ──────────────────────────────────────────────────
 
-def nettoyer(df: pd.DataFrame, colonnes_inspection: list) -> dict:
+def nettoyer(df: pd.DataFrame, colonnes_inspection: list, choisir_traitement=None) -> dict:
     """
     Applique toutes les étapes de nettoyage dans l'ordre.
+    choisir_traitement : fonction qui reçoit le jeu presque propre et rend la décision d'Atlas
+    sur les cases vides. Si elle échoue ou n'est pas donnée, les cases vides restent vides.
     Retourne le DataFrame nettoyé + le journal des opérations.
     """
     journal = []
@@ -149,7 +242,19 @@ def nettoyer(df: pd.DataFrame, colonnes_inspection: list) -> dict:
     df, ops = convertir_dates(df, colonnes_inspection)
     journal.extend(ops)
 
-    df, ops = imputer_valeurs_manquantes(df, colonnes_inspection)
+    # Atlas : un seul appel, deux missions (vérifier les rôles, choisir le traitement des cases vides)
+    decision = None
+    if choisir_traitement is not None:
+        try:
+            decision = choisir_traitement(df)
+        except Exception as e:
+            print(f"[NETTOYAGE] Atlas n'a pas pu être consulté : {str(e)[:200]}")
+
+    colonnes_inspection = [dict(c) for c in colonnes_inspection]  # copie : l'inspection d'origine reste intacte
+    df, ops, roles_atlas = corriger_roles(df, colonnes_inspection, decision)
+    journal.extend(ops)
+
+    df, ops = imputer_valeurs_manquantes(df, colonnes_inspection, decision)
     journal.extend(ops)
 
     anomalies = detecter_anomalies(df, colonnes_inspection)
@@ -160,4 +265,5 @@ def nettoyer(df: pd.DataFrame, colonnes_inspection: list) -> dict:
         "anomalies": anomalies,
         "nb_lignes_final": len(df),
         "nb_colonnes_final": len(df.columns),
+        "roles_atlas": roles_atlas,
     }

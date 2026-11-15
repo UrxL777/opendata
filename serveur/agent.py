@@ -440,7 +440,65 @@ def fiche_compacte(fiche: dict, avec_exemples: bool = True, budget_tokens: int =
     return compacte
 
 
-TYPES_GRAPHIQUES = {"barres", "barres_horizontales", "barres_groupees", "courbe", "camembert"}
+# ─── Atlas décide du traitement des cases vides (au moment du nettoyage) ───────
+
+PROMPT_MANQUANTS = """Tu es Atlas, l'assistant data analyst de la plateforme OpenData. Un jeu de données vient d'être publié. Il va servir à construire un dashboard descriptif (moyennes, comparaisons entre groupes, évolutions), pas à entraîner un modèle de machine learning.
+Tu reçois sa fiche d'identité (colonnes, rôles, pourcentage de cases vides "pct_manquants", statistiques, exemples). Tu ne vois pas les données elles-mêmes. Les rôles ont été devinés par un programme qui ne comprend pas le sens des colonnes : toi, tu le comprends.
+
+MISSION 1 : VÉRIFIER LES RÔLES.
+Rôles possibles : "quantitative" (des nombres qu'on peut additionner ou moyenner : prix, âge, température), "categorielle" (des groupes : compagnie, région, oui/non, nombre d'escales), "date", "identifiant" (un numéro ou un code unique par ligne, ou un code qu'on ne calcule jamais : code postal, numéro de client), "texte_libre" (phrases, commentaires, ou valeurs presque toutes différentes qui ne forment pas de groupes).
+Ne corrige que les rôles vraiment faux (ex. un code postal classé "quantitative" → "identifiant" ; des notes de 1 à 5 classées "quantitative" restent "quantitative"). Si tous les rôles sont justes, "roles_corriges" est vide.
+
+MISSION 2 : LES CASES VIDES.
+Pour CHAQUE colonne dont "pct_manquants" est supérieur à 0, choisis ce qu'il faut faire de ses cases vides, comme un data analyst expérimenté qui comprend le sens de la colonne.
+Tu choisis UNIQUEMENT parmi ces 4 actions :
+- "laisser_vide" : on ne devine pas. Les cases vides ne comptent pas dans les calculs. C'est le choix par défaut, le plus honnête pour un dashboard.
+- "mediane" : remplir avec la médiane (une colonne de nombres seulement).
+- "moyenne" : remplir avec la moyenne (une colonne de nombres seulement, sans valeurs extrêmes).
+- "mode" : remplir avec la valeur la plus fréquente.
+
+Pour bien juger :
+- Remplir une case, c'est inventer une valeur. Fais-le seulement si c'est sans risque pour l'analyse : très peu de cases vides ET une valeur de remplacement très probable (ex. 1 % de vides dans une colonne où presque toutes les lignes ont la même valeur).
+- Si deviner la valeur fausserait les comptes ou les comparaisons (ex. attribuer une compagnie, une région, un sexe, un prix à une ligne qui n'en a pas), choisis "laisser_vide".
+- Identifie aussi la "colonne_principale" : la colonne que l'on cherche à expliquer (prix, frais, ventes, note…). On ne remplit jamais ses cases vides.
+- "raison" : une phrase courte en français, compréhensible par quelqu'un qui n'est pas data analyst, qui explique ton choix à partir du sens de CETTE colonne (ex. « On ne peut pas deviner la compagnie d'un vol : la remplir fausserait le nombre de vols par compagnie. »). Jamais la même phrase générale pour toutes les colonnes.
+
+Réponds UNIQUEMENT avec ce JSON (les noms de colonnes écrits exactement comme dans la fiche) :
+{"roles_corriges": {"nom exact": {"role": "identifiant", "raison": "..."}}, "colonne_principale": "nom exact", "colonnes": {"nom exact": {"action": "laisser_vide", "raison": "..."}}}"""
+
+
+def choisir_traitement_manquants(fiche: dict) -> dict:
+    """
+    Atlas lit la fiche d'identité et, en un seul appel : corrige les rôles faux, et choisit pour chaque colonne
+    qui a des cases vides une action du menu (laisser_vide, mediane, moyenne, mode).
+    Le nettoyeur vérifie ces choix avant de les appliquer.
+    Un seul appel au modèle ; la fiche a la même taille quel que soit le nombre de lignes du fichier.
+    """
+    avec_vides = [c["nom"] for c in fiche["colonnes"] if c.get("pct_manquants", 0) > 0]
+    print(f"[NETTOYAGE] Atlas décide pour {len(avec_vides)} colonne(s) avec des cases vides : {avec_vides}")
+    reponse = completion_avec_secours(
+        messages=[
+            {"role": "system", "content": PROMPT_MANQUANTS},
+            {"role": "user", "content": json.dumps(fiche_compacte(fiche, budget_tokens=2500), ensure_ascii=False)},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.1,
+        max_tokens=2000,
+        timeout=40,
+    )
+    texte = reponse.choices[0].message.content or ""
+    debut, fin = texte.find("{"), texte.rfind("}")
+    decision = json.loads(texte[debut:fin + 1])
+    if not isinstance(decision, dict):
+        raise ValueError("Réponse d'Atlas illisible.")
+    if not isinstance(decision.get("colonnes"), dict):
+        decision["colonnes"] = {}
+    if getattr(reponse, "usage", None):
+        print(f"[NETTOYAGE] Tokens utilisés : {reponse.usage.total_tokens}")
+    return decision
+
+
+TYPES_GRAPHIQUES ={"barres", "barres_horizontales", "barres_groupees", "courbe", "camembert"}
 
 PROMPT_ANALYSTE_ROLE = """Tu es Atlas, l'assistant data analyst de la plateforme OpenData, dans ton rôle d'analyste : tu construis automatiquement un dashboard pour chaque jeu de données publié, comme un data analyst expérimenté.
 Tu ne vois jamais les données elles-mêmes : tu reçois leur fiche d'identité (colonnes, rôles, statistiques, lignes d'exemple). Tu écris des requêtes SQL (DuckDB) que le serveur exécute sur le fichier complet, puis tu interprètes les résultats.
@@ -479,7 +537,7 @@ PROMPT_QUESTIONNER = PROMPT_ANALYSTE_ROLE + """
 Tu reçois ta compréhension du jeu de données, tes colonnes calculées, la fiche, et le CLASSEMENT DES FACTEURS calculé par le serveur sur tout le fichier : pour chaque facteur, l'écart de la colonne principale entre le groupe le plus haut et le plus bas. Plus l'écart est grand, plus le facteur compte. Le champ "important" vaut true pour les facteurs qui comptent vraiment : ce sont les SEULS facteurs à étudier dans les graphiques.
 
 Construis un dashboard COHÉRENT qui répond à la question centrale. Les graphiques ne sont pas indépendants : ils racontent une histoire, du général au détail, et aident à prendre une décision.
-- "kpi" : 2 à 4 indicateurs clés (ex. nombre total, moyenne de la colonne principale, part d'un groupe important). Chaque KPI : {"titre": "...", "sql": "requête qui rend UNE seule ligne et UNE seule valeur"}.
+- "kpi" : 2 à 4 indicateurs clés (ex. nombre total, moyenne de la colonne principale, part d'un groupe important). Chaque KPI : {"titre": "...", "colonne": "nom exact de la colonne mesurée (ex. la colonne principale pour une moyenne), ou null si le KPI compte simplement des lignes", "sql": "requête qui rend UNE seule ligne et UNE seule valeur"}.
 - "graphiques" : 3 à 6 graphiques au maximum, par ordre d'importance :
   1. le facteur le plus important (la colonne principale comparée entre ses groupes) ;
   2. les autres facteurs marqués "important": true, un graphique chacun ;
@@ -695,6 +753,20 @@ def _trier_si_ordonne(resultat: dict, x: str, serie: str | None) -> dict:
     return {**resultat, "lignes": lignes_triees}
 
 
+def base_du_kpi(chemin: str, colonne: str | None, filtres: dict | None, colonnes_calculees: list) -> dict:
+    """
+    Sur combien de lignes un KPI est calculé (la phrase « calculé sur N » sous le chiffre).
+    Python compte, avec les mêmes filtres que le KPI : aucun token.
+    nb = lignes qui ont une valeur dans la colonne mesurée ; nb_sans_valeur = lignes où elle est vide.
+    """
+    c = '"' + str(colonne).replace('"', '""') + '"' if colonne else "*"
+    res = executer_requete(chemin, f"SELECT COUNT(*) AS total, COUNT({c}) AS nb FROM donnees", filtres, colonnes_calculees)
+    if not res["ok"] or not res["lignes"]:
+        return {"nb": None, "nb_sans_valeur": None}
+    total, nb = res["lignes"][0]
+    return {"nb": nb, "nb_sans_valeur": total - nb}
+
+
 def _valeurs_filtre(chemin: str, colonne: str, colonnes_calculees: list) -> list | None:
     """Liste des valeurs possibles d'un filtre, avec leur effectif. None si le filtre n'est pas utilisable."""
     c = '"' + str(colonne).replace('"', '""') + '"'
@@ -746,6 +818,7 @@ def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement:
             "id": p["id"], "titre": retirer_devises_inventees(str(p.get("titre") or calcul["titre"]), reference),
             "format": p.get("format") if p.get("format") in ("nombre", "monnaie", "pourcentage") else "nombre",
             "unite": retirer_devises_inventees(str(p.get("unite") or ""), reference), "valeur": valeur, "sql": calcul["sql"],
+            "colonne": calcul.get("colonne"),
         })
         if len(kpi) == MAX_KPI:
             break
@@ -866,7 +939,10 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
     calculs = {}
     for i, k in enumerate((plan.get("kpi") or [])[:MAX_KPI], 1):
         if isinstance(k, dict) and k.get("sql"):
-            calculs[f"k{i}"] = {"type": "kpi", "titre": k.get("titre", ""), "sql": k["sql"]}
+            colonne = k.get("colonne")
+            noms_valides = set(roles) | {c["nom"] for c in colonnes_calculees}
+            calculs[f"k{i}"] = {"type": "kpi", "titre": k.get("titre", ""), "sql": k["sql"],
+                                "colonne": colonne if colonne in noms_valides else None}
     for i, g in enumerate((plan.get("graphiques") or [])[:MAX_GRAPHIQUES], 1):
         if isinstance(g, dict) and g.get("sql"):
             calculs[f"g{i}"] = {"type": "graphique", "question": g.get("question", ""), "pourquoi": g.get("pourquoi", ""),
@@ -931,6 +1007,8 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
                                   kpi_calcules, graphiques_calcules, presentation, filtres, effectif_min,
                                   reference=" ".join([fiche.get("titre") or "", fiche.get("description") or ""]
                                                      + [c["nom"] for c in fiche["colonnes"]]))
+    for k in dashboard["kpi"]:
+        k.update(base_du_kpi(chemin_propre, k.get("colonne"), None, colonnes_calculees))
     print(f"[ANALYSTE] ✓ Dashboard prêt : {len(dashboard['kpi'])} KPI, {len(dashboard['graphiques'])} graphiques, "
           f"{len(dashboard['filtres'])} filtres")
     return dashboard
