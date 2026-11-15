@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { supabase } from '../supabase'
 import { IconeCategorie } from '../utilitaires/iconeCategorie'
+import Pagination from '../composants/Pagination'
 
 const DATASETS_PAR_PAGE = 10
 
@@ -11,45 +12,6 @@ function formaterTaille(octets) {
   if (octets < 1024) return `${octets} o`
   if (octets < 1024 * 1024) return `${(octets / 1024).toFixed(1)} Ko`
   return `${(octets / 1024 / 1024).toFixed(1)} Mo`
-}
-
-function Pagination({ pageCourante, totalPages, onChanger }) {
-  if (totalPages <= 1) return null
-
-  const pages = []
-  for (let i = 1; i <= totalPages; i++) pages.push(i)
-
-  return (
-    <div className="flex justify-center items-center gap-1 mt-8 flex-wrap">
-      <button
-        onClick={() => onChanger(pageCourante - 1)}
-        disabled={pageCourante === 1}
-        className="px-3 py-2 text-sm rounded-lg border border-bordure text-texte-secondaire hover:bg-fond-doux disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Précédent
-      </button>
-      {pages.map(p => (
-        <button
-          key={p}
-          onClick={() => onChanger(p)}
-          className={`w-9 h-9 text-sm rounded-lg border ${
-            p === pageCourante
-              ? 'bg-principal text-texte-inverse border-principal'
-              : 'border-bordure text-texte-secondaire hover:bg-fond-doux'
-          }`}
-        >
-          {p}
-        </button>
-      ))}
-      <button
-        onClick={() => onChanger(pageCourante + 1)}
-        disabled={pageCourante === totalPages}
-        className="px-3 py-2 text-sm rounded-lg border border-bordure text-texte-secondaire hover:bg-fond-doux disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Suivant
-      </button>
-    </div>
-  )
 }
 
 export default function Donnees() {

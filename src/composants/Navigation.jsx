@@ -27,13 +27,17 @@ export default function Navigation() {
   const location = useLocation()
   const [menuOuvert, setMenuOuvert] = useState(false)
 
+  // Une rubrique reste soulignée sur ses sous-pages (ex. « Dashboards » sur /dashboards/12)
+  const estActif = (chemin) =>
+    location.pathname === chemin || (chemin !== '/' && location.pathname.startsWith(chemin + '/'))
+
   const lienActif = (chemin) =>
-    location.pathname === chemin
+    estActif(chemin)
       ? 'text-principal border-b-2 border-principal pb-1'
       : 'text-texte-secondaire hover:text-principal'
 
   const lienActifMobile = (chemin) =>
-    location.pathname === chemin
+    estActif(chemin)
       ? 'text-principal font-semibold'
       : 'text-texte-moyen'
 
@@ -73,7 +77,7 @@ export default function Navigation() {
           <nav className="flex items-center gap-8">
             <Link to="/" className={`text-sm font-medium ${lienActif('/')}`}>Accueil</Link>
             <Link to="/donnees" className={`text-sm font-medium ${lienActif('/donnees')}`}>Données</Link>
-            <Link to="/visualisation" className={`text-sm font-medium ${lienActif('/visualisation')}`}>Dashboards</Link>
+            <Link to="/dashboards" className={`text-sm font-medium ${lienActif('/dashboards')}`}>Dashboards</Link>
           </nav>
           <BoutonPublier />
         </div>
@@ -91,8 +95,8 @@ export default function Navigation() {
               className={`text-sm font-medium py-3 border-b border-bordure-legere ${lienActifMobile('/donnees')}`}>
               Données
             </Link>
-            <Link to="/visualisation" onClick={fermerMenu}
-              className={`text-sm font-medium py-3 border-b border-bordure-legere ${lienActifMobile('/visualisation')}`}>
+            <Link to="/dashboards" onClick={fermerMenu}
+              className={`text-sm font-medium py-3 border-b border-bordure-legere ${lienActifMobile('/dashboards')}`}>
               Dashboards
             </Link>
             <div className="pt-3 pb-2">

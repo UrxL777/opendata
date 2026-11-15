@@ -10,7 +10,7 @@ const ETAPES = [
   { titre: 'Déposez votre fichier', texte: "CSV, Excel ou JSON, jusqu'à 50 Mo." },
   { titre: "L'IA le décrit pour vous", texte: 'Titre, description et catégorie proposés automatiquement. Vous pouvez les modifier.' },
   { titre: 'Rapport de qualité automatique', texte: 'Valeurs manquantes, doublons et nettoyage des données, détectés dès la publication.' },
-  { titre: 'Explorez avec Atlas', texte: "L'assistant qui vous guide dans l'analyse, avec du code Python si vous le souhaitez." },
+  { titre: 'Un dashboard créé par Atlas', texte: "Atlas analyse vos données comme un data analyst, construit un dashboard interactif et vous l'explique." },
 ]
 
 export default function Accueil() {
@@ -28,9 +28,11 @@ export default function Accueil() {
         .from('profiles')
         .select('*', { count: 'exact', head: true })
 
+      // Les dashboards créés par Atlas (seulement ceux qui sont prêts)
       const { count: dashboards } = await supabase
-        .from('visualisations')
+        .from('dashboards')
         .select('*', { count: 'exact', head: true })
+        .eq('statut', 'termine')
 
       const { data: fichiers } = await supabase
         .from('fichiers')

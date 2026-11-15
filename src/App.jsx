@@ -5,7 +5,8 @@ import PiedDePage from './composants/PiedDePage'
 import Accueil from './pages/Accueil'
 import Donnees from './pages/Donnees'
 import Detail from './pages/Detail'
-import Visualisation from './pages/Visualisation'
+import Dashboards from './pages/Dashboards'
+import Dashboard from './pages/Dashboard'
 import ReinitalisationMdp from './pages/ReinitalisationMdp'
 
 // Affiche chaque nouvelle page depuis le haut
@@ -26,7 +27,8 @@ export default function App() {
             <Route path="/" element={<Accueil />} />
             <Route path="/donnees" element={<Donnees />} />
             <Route path="/donnees/:id" element={<Detail />} />
-            <Route path="/visualisation" element={<Visualisation />} />
+            <Route path="/dashboards" element={<Dashboards />} />
+            <Route path="/dashboards/:id" element={<Dashboard />} />
             <Route path="/reinitialisation-mdp" element={<ReinitalisationMdp />} />
           </Routes>
         </div>
