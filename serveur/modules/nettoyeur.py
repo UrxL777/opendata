@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from dateutil import parser as dateutil_parser
+from modules.inspecteur import convertir_en_dates
 
 # ─── Corrections automatiques sûres (catégorie 1) ──────────────────────────────
 
@@ -47,8 +48,15 @@ def convertir_dates(df: pd.DataFrame, colonnes_inspection: list) -> tuple[pd.Dat
     cols_dates = [c["nom"] for c in colonnes_inspection if c["role_estime"] == "date" and c["nom"] in df.columns]
     for col in cols_dates:
         try:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
-            operations.append(f"Colonne '{col}' convertie en date.")
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                continue
+            avant = int(df[col].notna().sum())
+            df[col] = convertir_en_dates(df[col])
+            illisibles = avant - int(df[col].notna().sum())
+            message = f"Colonne '{col}' convertie en date (formats harmonisés)."
+            if illisibles:
+                message += f" {illisibles} date(s) illisible(s) laissée(s) vide(s), aucune n'est inventée."
+            operations.append(message)
         except Exception:
             operations.append(f"Colonne '{col}' : conversion en date échouée, conservée telle quelle.")
     return df, operations

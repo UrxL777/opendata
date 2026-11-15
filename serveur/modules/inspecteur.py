@@ -1,7 +1,43 @@
 import re
+import warnings
 import pandas as pd
 import chardet
 import os
+
+# Une colonne de texte est considérée comme une colonne de dates si au moins 80 % de ses
+# valeurs sont des dates lisibles. Seuil prudent : convertir une colonne à tort rendrait vides
+# toutes les valeurs qui ne sont pas des dates.
+SEUIL_DATES = 0.8
+
+# Une valeur « ressemble » à une date si elle contient des chiffres séparés par - / . ou :
+# (ex. 2025-01-15, 15/02/2025, 14:30) ou un nom de mois en anglais.
+FORME_DATE = re.compile(
+    r"\d{1,4}\s*[-/.:]\s*\d{1,2}"
+    r"|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b",
+    re.IGNORECASE,
+)
+
+
+def convertir_en_dates(serie: pd.Series) -> pd.Series:
+    """
+    Convertit une colonne de texte en dates. Accepte plusieurs formats dans la même colonne
+    et lit le jour avant le mois (02/03/2025 = 2 mars). Une valeur illisible devient vide,
+    elle n'est jamais inventée.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return pd.to_datetime(serie, errors="coerce", format="mixed", dayfirst=True)
+
+
+def proportion_de_dates(serie: pd.Series) -> float:
+    """Part des valeurs (non vides) qui sont des dates lisibles, entre 0 et 1."""
+    valeurs = serie.dropna().astype(str).str.strip()
+    valeurs = valeurs[valeurs != ""].head(500)
+    if valeurs.empty:
+        return 0.0
+    ressemble = valeurs.str.contains(FORME_DATE)
+    lisible = convertir_en_dates(valeurs).notna()
+    return float((ressemble & lisible).mean())
 
 # ─── Lecture du fichier selon son format ───────────────────────────────────────
 
@@ -52,23 +88,29 @@ def detecter_role(serie: pd.Series, nom_colonne: str) -> str:
     if mots_du_nom & mots_identifiant:
         return "identifiant"
 
-    # Tenter une conversion en date (sans infer_datetime_format, supprimé en pandas 2.2)
-    if serie.dtype == object:
-        try:
-            pd.to_datetime(serie.dropna().head(50), errors="raise")
-            return "date"
-        except Exception:
-            pass
+    # Colonne déjà convertie en dates
+    if pd.api.types.is_datetime64_any_dtype(serie):
+        return "date"
+
+    # Colonne de texte : date si au moins SEUIL_DATES (80 %) des valeurs sont des dates
+    if serie.dtype == object and proportion_de_dates(serie) >= SEUIL_DATES:
+        return "date"
 
     # Colonne numérique
-    if pd.api.types.is_numeric_dtype(serie):
-        nb_uniques = serie.nunique()
-        nb_lignes = serie.count()
-        # Des nombres entiers tous différents ressemblent à un identifiant ;
-        # des mesures à virgule (température, prix...) sont presque toujours toutes différentes
-        if nb_uniques == nb_lignes and nb_lignes > 10 and pd.api.types.is_integer_dtype(serie):
+    if pd.api.types.is_numeric_dtype(serie) and not pd.api.types.is_bool_dtype(serie):
+        valeurs = serie.dropna()
+        nb_uniques = valeurs.nunique()
+        nb_lignes = valeurs.count()
+        # Des nombres entiers tous différents ressemblent à un identifiant
+        if pd.api.types.is_integer_dtype(serie) and nb_uniques == nb_lignes and nb_lignes > 10:
             return "identifiant"
-        if nb_uniques <= 20:
+        # Nombres entiers, même enregistrés avec une virgule (3.0) quand la colonne a des vides
+        entiers = pd.api.types.is_integer_dtype(serie) or bool((valeurs % 1 == 0).all())
+        # Un nombre à virgule (montant, prix, température…) est toujours une mesure
+        if not entiers:
+            return "quantitative"
+        # Peu de valeurs entières qui se répètent (nombre d'enfants, note de 1 à 5…) : une catégorie
+        if nb_uniques <= 20 and nb_uniques <= nb_lignes / 2:
             return "categorielle"
         return "quantitative"
 
