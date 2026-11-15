@@ -65,9 +65,6 @@ export default function Accueil() {
     charger()
   }, [])
 
-  const categoriesAffichees = categories
-  const plusDeCategories = false
-
   return (
     <div>
       <section className="bg-gradient-to-b from-degrade-debut to-degrade-fin py-20 px-4 text-center">
@@ -133,7 +130,7 @@ export default function Accueil() {
         <h2 className="text-2xl font-bold text-texte-titre mb-2">Explorez nos catégories de données</h2>
         <p className="text-texte-doux mb-10">Des données structurées par domaine pour faciliter vos recherches</p>
         <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {categoriesAffichees.map((cat) => (
+          {categories.map((cat) => (
             <Link
               key={cat.id}
               to={`/donnees?categorie=${cat.id}`}
@@ -153,17 +150,6 @@ export default function Accueil() {
             </Link>
           ))}
         </div>
-
-        {plusDeCategories && (
-          <div className="mt-8">
-            <Link
-              to="/donnees"
-              className="inline-flex items-center gap-2 border border-principal text-principal hover:bg-fond-bleu-clair px-6 py-2.5 rounded-lg text-sm font-medium transition"
-            >
-              Voir toutes les catégories
-            </Link>
-          </div>
-        )}
       </section>
     </div>
   )

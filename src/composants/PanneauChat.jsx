@@ -4,7 +4,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 // Conversation avec Atlas (utilisée sur la page d'un dashboard)
-export default function PanneauChat({ jeuId, estMobile, afficherHeader = true, sousTitre = 'Questions sur ce jeu de données' }) {
+// L'en-tête (« Atlas », bouton fermer) est affiché par la page qui contient le panneau
+export default function PanneauChat({ jeuId, estMobile }) {
   const cleStockage = `chat_${jeuId}`
 
   const [messages, setMessages] = useState(() => {
@@ -64,13 +65,6 @@ export default function PanneauChat({ jeuId, estMobile, afficherHeader = true, s
 
   return (
     <div className="flex flex-col h-full">
-      {afficherHeader && (
-        <div className="p-3 border-b border-bordure shrink-0">
-          <p className="font-semibold text-texte text-sm">Atlas</p>
-          <p className="text-xs text-texte-discret">{sousTitre}</p>
-        </div>
-      )}
-
       <div
         ref={basMessages}
         className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0"

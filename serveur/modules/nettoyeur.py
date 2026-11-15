@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from dateutil import parser as dateutil_parser
 from modules.inspecteur import convertir_en_dates, proportion_de_dates, SEUIL_DATES
 
 # ─── Corrections automatiques sûres (catégorie 1) ──────────────────────────────

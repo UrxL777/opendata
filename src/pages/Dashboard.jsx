@@ -243,7 +243,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="flex-1 min-h-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-              <PanneauChat jeuId={id} estMobile={true} afficherHeader={false} />
+              <PanneauChat jeuId={id} estMobile={true} />
             </div>
           </div>
         )}
@@ -272,7 +272,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            <PanneauChat jeuId={id} estMobile={false} afficherHeader={false} />
+            <PanneauChat jeuId={id} estMobile={false} />
           </div>
         </aside>
       )}
