@@ -152,3 +152,117 @@ def inspecter(chemin: str, nom_fichier: str) -> dict:
         },
        "apercu": df.head(5).where(pd.notnull(df.head(5)), None).to_dict(orient="records"),
     }
+
+
+# ─── Fiche d'identité du jeu de données PROPRE (pour l'Analyste) ───────────────
+
+def _valeur_simple(v, longueur_max: int = 60):
+    """Rend une valeur lisible en JSON (dates en texte, NaN en None, textes raccourcis)."""
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if isinstance(v, pd.Timestamp):
+        return v.isoformat()
+    if hasattr(v, "item"):  # nombres numpy → nombres Python
+        v = v.item()
+    if isinstance(v, float):
+        return round(v, 4)
+    if isinstance(v, str) and len(v) > longueur_max:
+        return v[:longueur_max] + "…"
+    return v
+
+
+def _role_colonne_propre(serie: pd.Series, nom: str) -> str:
+    """Rôle d'une colonne après nettoyage (les dates sont déjà de vraies dates)."""
+    if pd.api.types.is_datetime64_any_dtype(serie):
+        return "date"
+    if pd.api.types.is_bool_dtype(serie):
+        return "categorielle"
+    return detecter_role(serie, nom)
+
+
+def _type_simple(serie: pd.Series) -> str:
+    """Type de la colonne en mots simples, pour que l'Analyste écrive un SQL correct."""
+    if pd.api.types.is_bool_dtype(serie):
+        return "booleen"
+    if pd.api.types.is_integer_dtype(serie):
+        return "entier"
+    if pd.api.types.is_float_dtype(serie):
+        return "decimal"
+    if pd.api.types.is_datetime64_any_dtype(serie):
+        return "date"
+    return "texte"
+
+
+def fiche_identite(df: pd.DataFrame, titre: str = "", description: str = "") -> dict:
+    """
+    Décrit le jeu de données PROPRE pour l'Analyste, sans lui donner les données elles-mêmes.
+    Pour chaque colonne : son type, son rôle et des statistiques adaptées à ce rôle.
+    Le jeu de données est lu en entier par Python ; seule cette description sera envoyée au modèle.
+    """
+    nb_lignes, nb_colonnes = df.shape
+    colonnes = []
+
+    for nom in df.columns:
+        serie = df[nom]
+        role = _role_colonne_propre(serie, nom)
+        nb_manquants = int(serie.isna().sum())
+        info = {
+            "nom": str(nom),
+            "type": _type_simple(serie),
+            "role": role,
+            "pct_manquants": round(nb_manquants / nb_lignes * 100, 1) if nb_lignes else 0,
+            "nb_valeurs_differentes": int(serie.nunique(dropna=True)),
+        }
+        valeurs = serie.dropna()
+
+        if role == "quantitative" and pd.api.types.is_numeric_dtype(serie) and not valeurs.empty:
+            info.update({
+                "min": _valeur_simple(valeurs.min()),
+                "max": _valeur_simple(valeurs.max()),
+                "moyenne": _valeur_simple(valeurs.mean()),
+                "mediane": _valeur_simple(valeurs.median()),
+                "ecart_type": _valeur_simple(valeurs.std()) if len(valeurs) > 1 else None,
+            })
+
+        elif role == "categorielle" and not valeurs.empty:
+            comptes = valeurs.value_counts().head(10)
+            info["valeurs_frequentes"] = [
+                {"valeur": _valeur_simple(v), "pct": round(int(n) / len(valeurs) * 100, 1)}
+                for v, n in comptes.items()
+            ]
+            if pd.api.types.is_numeric_dtype(serie) and not pd.api.types.is_bool_dtype(serie):
+                info["min"] = _valeur_simple(valeurs.min())
+                info["max"] = _valeur_simple(valeurs.max())
+
+        elif role == "date" and not valeurs.empty:
+            dates = valeurs if pd.api.types.is_datetime64_any_dtype(serie) else pd.to_datetime(valeurs, errors="coerce").dropna()
+            if not dates.empty:
+                info["premiere_date"] = _valeur_simple(dates.min())
+                info["derniere_date"] = _valeur_simple(dates.max())
+
+        else:  # texte libre, identifiant, inconnu : quelques exemples suffisent
+            info["exemples"] = [_valeur_simple(v) for v in valeurs.drop_duplicates().head(3)]
+
+        colonnes.append(info)
+
+    # 10 lignes d'exemple, prises dans tout le fichier (pas seulement le début)
+    echantillon = df.sample(n=min(10, nb_lignes), random_state=42).sort_index() if nb_lignes else df
+    lignes_exemple = [
+        {str(c): _valeur_simple(v) for c, v in ligne.items()}
+        for ligne in echantillon.to_dict(orient="records")
+    ]
+
+    return {
+        "titre": titre or "",
+        "description": description or "",
+        "nb_lignes": int(nb_lignes),
+        "nb_colonnes": int(nb_colonnes),
+        "table_sql": "donnees",
+        "colonnes": colonnes,
+        "lignes_exemple": lignes_exemple,
+    }
