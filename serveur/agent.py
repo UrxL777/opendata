@@ -682,7 +682,7 @@ def retirer_devises_inventees(texte: str, reference: str) -> str:
     for mots, motif in DEVISES:
         if not any(m in reference for m in mots):
             texte = re.sub(motif, "", texte, flags=re.IGNORECASE)
-    return texte.strip()
+    return re.sub(r"\s*\(\s*\)", "", texte).strip()
 
 
 def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement: list,
