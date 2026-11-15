@@ -400,7 +400,7 @@ def _reduire_fiche(fiche: dict, niveau: int, avec_exemples: bool) -> dict:
     1 : 6 valeurs fréquentes, 2 exemples, 5 lignes d'exemple ;  2 : 3 valeurs fréquentes, 2 lignes d'exemple ;
     3 : l'essentiel de chaque colonne (nom, type, rôle, min, max) ;  4 : en plus, 40 colonnes au maximum.
     """
-    essentiel = ("nom", "type", "role", "pct_manquants", "nb_valeurs_differentes", "min", "max", "premiere_date", "derniere_date")
+    essentiel = ("nom", "type", "role", "nb_manquants", "pct_manquants", "nb_valeurs_differentes", "min", "max", "premiere_date", "derniere_date")
     colonnes = []
     for c in fiche["colonnes"]:
         if niveau >= 3:
@@ -444,14 +444,14 @@ def fiche_compacte(fiche: dict, avec_exemples: bool = True, budget_tokens: int =
 # ─── Atlas décide du traitement des cases vides (au moment du nettoyage) ───────
 
 PROMPT_MANQUANTS = """Tu es Atlas, l'assistant data analyst de la plateforme OpenData. Un jeu de données vient d'être publié. Il va servir à construire un dashboard descriptif (moyennes, comparaisons entre groupes, évolutions), pas à entraîner un modèle de machine learning.
-Tu reçois sa fiche d'identité (colonnes, rôles, pourcentage de cases vides "pct_manquants", statistiques, exemples). Tu ne vois pas les données elles-mêmes. Les rôles ont été devinés par un programme qui ne comprend pas le sens des colonnes : toi, tu le comprends.
+Tu reçois sa fiche d'identité (colonnes, rôles, nombre de cases vides "nb_manquants" et leur pourcentage "pct_manquants", statistiques, exemples). Tu ne vois pas les données elles-mêmes. Les rôles ont été devinés par un programme qui ne comprend pas le sens des colonnes : toi, tu le comprends.
 
 MISSION 1 : VÉRIFIER LES RÔLES.
 Rôles possibles : "quantitative" (des nombres qu'on peut additionner ou moyenner : prix, âge, température), "categorielle" (des groupes : compagnie, région, oui/non, nombre d'escales), "date", "identifiant" (un numéro ou un code unique par ligne, ou un code qu'on ne calcule jamais : code postal, numéro de client), "texte_libre" (phrases, commentaires, ou valeurs presque toutes différentes qui ne forment pas de groupes).
 Ne corrige que les rôles vraiment faux (ex. un code postal classé "quantitative" → "identifiant" ; des notes de 1 à 5 classées "quantitative" restent "quantitative"). Si tous les rôles sont justes, "roles_corriges" est vide.
 
 MISSION 2 : LES CASES VIDES.
-Pour CHAQUE colonne dont "pct_manquants" est supérieur à 0, choisis ce qu'il faut faire de ses cases vides, comme un data analyst expérimenté qui comprend le sens de la colonne.
+Pour CHAQUE colonne dont "nb_manquants" est supérieur à 0 (même une seule case vide), choisis ce qu'il faut faire de ses cases vides, comme un data analyst expérimenté qui comprend le sens de la colonne.
 Tu choisis UNIQUEMENT parmi ces 4 actions :
 - "laisser_vide" : on ne devine pas. Les cases vides ne comptent pas dans les calculs. C'est le choix par défaut, le plus honnête pour un dashboard.
 - "mediane" : remplir avec la médiane (une colonne de nombres seulement).
@@ -475,7 +475,7 @@ def choisir_traitement_manquants(fiche: dict) -> dict:
     Le nettoyeur vérifie ces choix avant de les appliquer.
     Un seul appel au modèle ; la fiche a la même taille quel que soit le nombre de lignes du fichier.
     """
-    avec_vides = [c["nom"] for c in fiche["colonnes"] if c.get("pct_manquants", 0) > 0]
+    avec_vides = [c["nom"] for c in fiche["colonnes"] if c.get("nb_manquants", 0) > 0]
     print(f"[NETTOYAGE] Atlas décide pour {len(avec_vides)} colonne(s) avec des cases vides : {avec_vides}")
     reponse = completion_avec_secours(
         messages=[

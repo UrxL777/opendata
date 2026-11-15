@@ -258,6 +258,7 @@ def fiche_identite(df: pd.DataFrame, titre: str = "", description: str = "", rol
             "nom": str(nom),
             "type": _type_simple(serie),
             "role": role,
+            "nb_manquants": nb_manquants,
             "pct_manquants": round(nb_manquants / nb_lignes * 100, 1) if nb_lignes else 0,
             "nb_valeurs_differentes": int(serie.nunique(dropna=True)),
         }
