@@ -5,7 +5,7 @@ import { supabase } from '../supabase'
 import PanneauChat from '../composants/PanneauChat'
 import FiltresDashboard from '../composants/dashboard/FiltresDashboard'
 import GraphiqueDashboard from '../composants/dashboard/GraphiqueDashboard'
-import { formaterKpi, formaterNombre, MESSAGES_STATUT } from '../utilitaires/formatDashboard'
+import { formaterKpi, formaterNombre, libelleValeur, MESSAGES_STATUT } from '../utilitaires/formatDashboard'
 
 const SOUS_TITRE_ATLAS = 'Questions sur ce dashboard'
 
@@ -47,7 +47,7 @@ function CarteKpi({ kpi }) {
     <div className="bg-fond border border-bordure-legere rounded-xl p-3 shadow-sm">
       <p className="text-2xl font-bold text-principal">{formaterKpi(kpi)}</p>
       <p className="text-xs text-texte-doux mt-0.5">{kpi.titre}</p>
-      {kpi.nb != null && (
+      {kpi.nb != null && !kpi.sans_base && (
         <p className="text-xs text-texte-discret mt-1">
           calculé sur {formaterNombre(kpi.nb)} ligne{kpi.nb > 1 ? 's' : ''}
           {kpi.nb_sans_valeur > 0 ? ` (${formaterNombre(kpi.nb_sans_valeur)} sans valeur)` : ''}
@@ -156,7 +156,7 @@ export default function Dashboard() {
     appliquerFiltres({ ...choix, [colonne]: actuel.length === 1 && actuel[0] === valeur ? [] : [valeur] })
   }
   const resumeFiltres = Object.entries(choix).filter(([, v]) => v.length)
-    .map(([c, v]) => `${filtres.find(f => f.colonne === c)?.libelle ?? c} = ${v.join(', ')}`).join(' ; ')
+    .map(([c, v]) => `${filtres.find(f => f.colonne === c)?.libelle ?? c} = ${v.map(libelleValeur).join(', ')}`).join(' ; ')
 
   const page = (
     <div className={estMobile ? 'px-4 py-5' : 'max-w-6xl mx-auto px-6 py-6'}>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { SlidersHorizontal, ChevronDown, Check } from 'lucide-react'
-import { formaterNombre } from '../../utilitaires/formatDashboard'
+import { formaterNombre, libelleValeur } from '../../utilitaires/formatDashboard'
 
 // Un filtre : bouton « Nom : Tous » qui ouvre la liste des valeurs (plusieurs choix possibles)
 function Filtre({ filtre, choisies, onChanger }) {
@@ -14,7 +14,7 @@ function Filtre({ filtre, choisies, onChanger }) {
     return () => document.removeEventListener('mousedown', fermer)
   }, [ouvert])
 
-  const resume = choisies.length === 0 ? 'Tous' : choisies.length === 1 ? choisies[0] : `${choisies.length} choisis`
+  const resume = choisies.length === 0 ? 'Tous' : choisies.length === 1 ? libelleValeur(choisies[0]) : `${choisies.length} choisis`
   const basculer = v => onChanger(choisies.includes(v) ? choisies.filter(c => c !== v) : [...choisies, v])
 
   return (
@@ -38,7 +38,7 @@ function Filtre({ filtre, choisies, onChanger }) {
             return (
               <button key={v} onClick={() => basculer(v)} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-fond-doux text-left">
                 <span className="w-4">{choisies.includes(v) && <Check size={14} className="text-principal" />}</span>
-                <span className="flex-1">{v}</span>
+                <span className="flex-1">{libelleValeur(v)}</span>
                 <span className="text-xs text-texte-discret">{formaterNombre(nb)}</span>
               </button>
             )

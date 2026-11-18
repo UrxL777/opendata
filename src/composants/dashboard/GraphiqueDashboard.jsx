@@ -2,7 +2,7 @@ import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
-import { formaterNombre } from '../../utilitaires/formatDashboard'
+import { formaterNombre, libelleValeur } from '../../utilitaires/formatDashboard'
 
 // Les couleurs viennent de index.css : le bleu d'OpenData puis 5 couleurs qui s'accordent avec lui, toujours dans le même ordre
 const COULEURS = [1, 2, 3, 4, 5, 6].map(i => `var(--color-graphique-${i})`)
@@ -55,7 +55,7 @@ function couperEnLignes(texte, max) {
 
 // Graduation sous l'axe horizontal : le nom sur plusieurs lignes, centré sous la barre
 function GraduationBas({ x, y, payload, max }) {
-  const lignes = couperEnLignes(payload.value, max)
+  const lignes = couperEnLignes(libelleValeur(payload.value), max)
   return (
     <text x={x} y={y + 12} textAnchor="middle" fontSize={12} fill={COULEUR_TEXTE_AXE}>
       {lignes.map((l, i) => <tspan key={i} x={x} dy={i === 0 ? 0 : 14}>{l}</tspan>)}
@@ -65,7 +65,7 @@ function GraduationBas({ x, y, payload, max }) {
 
 // Graduation à gauche (barres horizontales) : le nom sur plusieurs lignes, centré sur la barre
 function GraduationGauche({ x, y, payload, max }) {
-  const lignes = couperEnLignes(payload.value, max)
+  const lignes = couperEnLignes(libelleValeur(payload.value), max)
   return (
     <text x={x - 6} y={y - ((lignes.length - 1) * 14) / 2 + 4} textAnchor="end" fontSize={12} fill={COULEUR_TEXTE_AXE}>
       {lignes.map((l, i) => <tspan key={i} x={x - 6} dy={i === 0 ? 0 : 14}>{l}</tspan>)}
@@ -123,7 +123,7 @@ function Bulle({ active, payload, label, graphique, effectifMin }) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-fond border border-bordure rounded-lg shadow-sm px-3 py-2 text-xs">
-      <p className="font-semibold text-texte mb-1">{label ?? payload[0]?.payload?.x}</p>
+      <p className="font-semibold text-texte mb-1">{libelleValeur(label ?? payload[0]?.payload?.x)}</p>
       {payload.map((p, i) => {
         const nb = graphique.serie ? p.payload[`nb_${p.name}`] : p.payload.nb
         return (
@@ -214,7 +214,7 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
     rendu = (
       <LineChart data={donnees} margin={marges}>
         <CartesianGrid stroke={COULEUR_GRILLE} vertical={false} />
-        <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(v, 12)} label={labelX} padding={{ left: 24, right: 24 }}
+        <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(libelleValeur(v), 12)} label={labelX} padding={{ left: 24, right: 24 }}
           interval={donnees.length > 12 ? Math.ceil(donnees.length / (compact ? 5 : 8)) - 1 : 0} />
         <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} {...echelle} />
         {bulle}

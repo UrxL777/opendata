@@ -6,6 +6,13 @@ export function formaterNombre(valeur) {
   return Number(valeur).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
 }
 
+// « 2019-03 » → « mars 2019 » (les autres valeurs restent telles quelles)
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+export function libelleValeur(valeur) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(valeur ?? ''))
+  return m && +m[2] >= 1 && +m[2] <= 12 ? `${MOIS[+m[2] - 1]} ${m[1]}` : String(valeur ?? '')
+}
+
 // Valeur d'un KPI selon son format (nombre, monnaie, pourcentage) et son unité
 export function formaterKpi(kpi, valeur = kpi.valeur) {
   if (valeur === null || valeur === undefined) return '—'

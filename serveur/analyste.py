@@ -17,7 +17,8 @@ import re
 
 import pandas as pd
 
-from agent import _appeler_analyste, mettre_en_forme_resultat, retirer_devises_inventees, _valeurs_filtre
+from agent import _appeler_analyste, mettre_en_forme_resultat, retirer_devises_inventees, _valeurs_filtre, \
+    completion_avec_secours
 from modules.requetes import executer_requete
 
 SEUIL_ECARTER = 30   # % de cases vides au-delà duquel une colonne est écartée de l'analyse
@@ -150,7 +151,7 @@ Règles pour les requêtes :
 - Pour un classement de plus de 20 éléments, garde les 10 premiers et les 10 derniers.
 - Pour une mesure qui ne s'additionne pas (prix, taux, moyenne, valeur par habitant), utilise la moyenne.
 - Le titre d'une évolution indique la période couverte et l'unité de temps.
-Pour chaque graphique : "titre" (clair pour quelqu'un qui n'est pas du domaine), "type" ("barres" ou "courbe"), "libelle_x", "libelle_y", "sql".
+Pour chaque graphique : "titre" (clair pour quelqu'un qui n'est pas du domaine), "type" ("barres" ou "courbe"), "libelle_x", "libelle_y" (noms d'axes courts en français, sans format technique comme YYYY-MM), "sql".
 Ajoute "pistes" : une ou deux phrases, sans chiffre, qui proposent au data analyst d'autres analyses qu'il pourrait faire lui-même.
 
 Réponds uniquement en JSON : {"question_phare": "...", "graphiques": [{"titre": "...", "type": "...", "libelle_x": "...", "libelle_y": "...", "sql": "..."}], "pistes": ["..."]}"""
@@ -208,7 +209,8 @@ PROMPT_MESSAGE = """Tu es Atlas, data analyst. Tu reçois la question phare d'un
 - "reponse" : deux ou trois phrases qui répondent directement à la question phare.
 - "graphiques" : pour chaque graphique reçu, avec le même "id" : un "texte" de deux à quatre phrases qui disent ce que montre le graphique.
 - "chiffres_cles" : deux ou trois chiffres importants tirés des résultats, chacun avec "titre" (court), "valeur" (le chiffre, avec l'unité si elle est donnée) et "detail" (qui ou quand).
-- "noms_filtres" : pour chaque colonne de "filtres", un nom court et lisible en français (ex. pour une colonne « sex » : « Sexe »).
+- "noms_filtres" : pour chaque colonne de "filtres", un nom court en français qui dit ce qu'elle contient, en traduisant les noms anglais (ex. pour une colonne « sex » : « Sexe »).
+- "nom_mesure" : le nom court en français de la moyenne de la mesure étudiée (ex. « Prix moyen », « Consommation moyenne »).
 
 Règles :
 - Utilise seulement les chiffres des résultats. Tu peux les écrire avec moins de décimales si c'est plus lisible, en arrondissant selon la règle : 5 et plus vers le haut. N'écris pas de zéros inutiles après la virgule, ni « environ » ou « ~ ». Ne calcule rien toi-même.
@@ -216,14 +218,16 @@ Règles :
 - Écris l'unité seulement si "unite_mesure" est donnée. Aucune devise ni unité qui n'est pas dans le titre ou les colonnes.
 - Décris ce que montrent les chiffres, sans en donner les causes.
 - Ne compare que ce qui a été calculé.
-- Recopie les noms exactement comme dans les résultats, ou traduis-les fidèlement.
+- Recopie les noms exactement comme dans les résultats, ou traduis-les fidèlement. Pour dire qui est le plus haut ou le plus bas, utilise "le_plus_haut" et "le_plus_bas" (et "debut" et "fin" pour une évolution), déjà repérés par Python.
 - Jamais le nombre de lignes du fichier.
 
-Réponds uniquement en JSON : {"reponse": "...", "graphiques": [{"id": "g1", "texte": "..."}], "chiffres_cles": [{"titre": "...", "valeur": "...", "detail": "..."}], "noms_filtres": {"colonne": "Nom lisible"}}"""
+Réponds uniquement en JSON : {"reponse": "...", "graphiques": [{"id": "g1", "texte": "..."}], "chiffres_cles": [{"titre": "...", "valeur": "...", "detail": "..."}], "noms_filtres": {"colonne": "Nom lisible"}, "nom_mesure": "..."}"""
 
 MOTS_DE_CAUSE = (r"\b(influenc\w*|impact\w*|détermin\w*|facteur\w*|à cause|en raison|reflèt\w*|refl[eè]te\w*|"
                  r"expliqu\w*|entraîn\w*|provoqu\w*|due?s? à|culturel\w*|législati\w*|coût de la vie)\b")
-REMPLACEMENTS_QUESTION = {r"\bl'impact\b": "le lien", r"\bimpact\b": "lien", r"\bfacteurs\b": "caractéristiques",
+REMPLACEMENTS_QUESTION = {r"\bexpliquent\b": "vont de pair avec", r"\bexplique\b": "va de pair avec",
+                          r"\bdéterminent\b": "vont de pair avec", r"\bdétermine\b": "va de pair avec",
+                          r"\bl'influence\b": "le lien", r"\bl'impact\b": "le lien", r"\bimpact\b": "lien", r"\bfacteurs\b": "caractéristiques",
                           r"\bfacteur\b": "caractéristique", r"\binfluencent\b": "vont de pair avec",
                           r"\binfluence\b": "va de pair avec", r"\bimpactent\b": "vont de pair avec",
                           r"\bimpacte\b": "va de pair avec", r"\bQuels caractéristiques\b": "Quelles caractéristiques"}
@@ -293,6 +297,45 @@ def _phrase_acceptable(phrase: str, autorises: set) -> bool:
     return not _inconnus(phrase, autorises) and not re.search(MOTS_DE_CAUSE, phrase, re.I)
 
 
+def neutraliser(texte: str) -> str:
+    """« l'impact du nombre d'escales sur le prix » → « le lien entre le nombre d'escales et le prix »."""
+    articles = {"du": "le ", "de la": "la ", "des": "les ", "de l'": "l'", "de": "", "d'": ""}
+    texte = re.sub(r"\b(?:l'|un |une )?(?:impact|influence|effet)s? (du|de la|des|de l'|de|d')\s?(.+?) sur ",
+                   lambda m: f"le lien entre {articles[m.group(1)]}{m.group(2)} et ", texte, flags=re.I)
+    for motif, neutre in REMPLACEMENTS_QUESTION.items():
+        texte = re.sub(motif, neutre, texte, flags=re.I)
+    return texte
+
+
+def sans_cause(textes: list[str]) -> list[str]:
+    """
+    Les phrases qui supposent une cause (« influence », « impact »…) sont reformulées par Atlas (petit modèle,
+    un seul appel), en gardant le sens. Si la reformulation échoue, le code remplace lui-même les mots.
+    """
+    a_revoir = [i for i, x in enumerate(textes) if re.search(MOTS_DE_CAUSE, x, re.I)]
+    if not a_revoir:
+        return textes
+    resultat = list(textes)
+    try:
+        reponse = completion_avec_secours(
+            messages=[{"role": "system", "content": (
+                "Reformule chaque phrase en français correct sans supposer de cause : remplace les idées d'influence, "
+                "d'impact ou d'explication par « va de pair avec », « est lié à » ou « le lien entre … et … ». "
+                "Garde le même sens, la même longueur et les mêmes noms. Aucun chiffre ajouté. "
+                'Réponds uniquement en JSON : {"phrases": ["...", "..."]} dans le même ordre.')},
+                {"role": "user", "content": json.dumps({"phrases": [textes[i] for i in a_revoir]}, ensure_ascii=False)}],
+            response_format={"type": "json_object"}, temperature=0.1, max_tokens=800, timeout=30)
+        contenu = reponse.choices[0].message.content or ""
+        nouvelles = json.loads(contenu[contenu.find("{"): contenu.rfind("}") + 1]).get("phrases") or []
+        for i, nouvelle in zip(a_revoir, nouvelles):
+            chiffres_avant = {v for _, v in nombres_du_texte(textes[i])}
+            if isinstance(nouvelle, str) and nouvelle.strip() and {v for _, v in nombres_du_texte(nouvelle)} <= chiffres_avant:
+                resultat[i] = nouvelle.strip()
+    except Exception as e:
+        print(f"[ANALYSTE] Reformulation impossible : {str(e)[:150]}")
+    return [neutraliser(x) if re.search(MOTS_DE_CAUSE, x, re.I) else x for x in resultat]
+
+
 def _filtrer(texte: str, autorises: set) -> str:
     """Dernier filet : une phrase qui garde un nombre inventé ou une cause non prouvée est retirée."""
     phrases = re.split(r"(?<=[.!?])\s+", texte.strip())
@@ -306,11 +349,23 @@ def _sans_zeros_inutiles(texte: str) -> str:
     return re.sub(r"(\d,\d)0(?!\d)", r"\1", texte)
 
 
+def _reperes(graphique: dict) -> dict:
+    """Python repère lui-même le plus haut, le plus bas, le début et la fin : Atlas n'a qu'à les recopier."""
+    lignes = [l for l in graphique["resultat"]["lignes"] if isinstance(l[1], (int, float))]
+    if not lignes:
+        return {}
+    haut, bas = max(lignes, key=lambda l: l[1]), min(lignes, key=lambda l: l[1])
+    reperes = {"le_plus_haut": haut[:2], "le_plus_bas": bas[:2]}
+    if graphique["type"] == "courbe":
+        reperes.update({"debut": lignes[0][:2], "fin": lignes[-1][:2]})
+    return reperes
+
+
 def ecrire_message(question: str, graphiques: list, unite: str | None, reference: str, filtres: list) -> dict:
     """Atlas écrit le texte ; Python refuse les chiffres inventés et les causes (2 réécritures), puis nettoie."""
     entree = json.dumps({"question_phare": question, "unite_mesure": unite, "filtres": [f["colonne"] for f in filtres],
                          "graphiques": [{"id": g["id"], "titre": g["titre"], "colonnes": g["resultat"]["colonnes"],
-                                         "lignes": g["resultat"]["lignes"]} for g in graphiques]},
+                                         "lignes": g["resultat"]["lignes"], **_reperes(g)} for g in graphiques]},
                         ensure_ascii=False, default=str)
     autorises = nombres_autorises([g["resultat"]["lignes"] for g in graphiques])
     messages = [{"role": "system", "content": PROMPT_MESSAGE}, {"role": "user", "content": entree}]
@@ -341,6 +396,7 @@ def ecrire_message(question: str, graphiques: list, unite: str | None, reference
         cles.append({"titre": net(k["titre"]), "valeur": net(k["valeur"]), "detail": net(detail)})
     msg["chiffres_cles"] = cles
     msg["noms_filtres"] = {str(k): str(v).strip()[:40] for k, v in noms_filtres.items() if str(v).strip()}
+    msg["nom_mesure"] = net(str(brut.get("nom_mesure") or "")).strip()[:40]
     return msg
 
 
@@ -373,8 +429,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
                                                 "colonnes_utiles": utiles}, ensure_ascii=False, default=str)},
     ], "question phare et requêtes")
     question = str(plan.get("question_phare") or "")
-    for motif, neutre in REMPLACEMENTS_QUESTION.items():
-        question = re.sub(motif, neutre, question, flags=re.I)  # pas de cause dans la question
+    question = sans_cause([question])[0]  # pas de cause dans la question
     print(f"[ANALYSTE] Question phare : {question}")
 
     # 4. Python exécute (Atlas corrige en cas d'erreur)
@@ -397,7 +452,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
         graphiques.append({
             "id": f"g{i}", "titre": retirer_devises_inventees(titre_g, reference), "question": question,
             "type": type_graphique, "x": x, "y": y, "serie": None,
-            "libelle_x": str(g.get("libelle_x") or x),
+            "libelle_x": re.sub(r"\s*\((?:YYYY|AAAA|yyyy|aaaa)[^)]*\)", "", str(g.get("libelle_x") or x)).strip(),
             "libelle_y": retirer_devises_inventees(str(g.get("libelle_y") or y), reference),
             "libelle_serie": None, "effectif": None, "phrase": "", "sql": g["sql"], "resultat": res,
         })
@@ -415,6 +470,17 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
         if len(filtres) == MAX_FILTRES:
             break
 
+    # Une colonne de dates donne un filtre par mois (colonne calculée « mois », comme dans Power BI)
+    colonnes_calculees = []
+    date = next((c["nom"] for c in utiles if c["type"] == "date"), None)
+    if date and len(filtres) < MAX_FILTRES + 1:
+        calcul = {"nom": "mois", "expression": 'strftime("' + date.replace('"', '""') + '", \'%Y-%m\')',
+                  "explication": f"Le mois de la colonne {date}"}
+        valeurs = _valeurs_filtre(chemin_propre, "mois", [calcul]) if "mois" not in df.columns else None
+        if valeurs:
+            colonnes_calculees.append(calcul)
+            filtres.insert(0, {"colonne": "mois", "valeurs": valeurs, "libelle": "Mois"})
+
     # 5. Atlas écrit le texte, Python le contrôle
     msg = ecrire_message(question, graphiques, desc["unite_mesure"], reference, filtres)
     textes = {g["id"]: g["texte"] for g in msg["graphiques"]}
@@ -422,19 +488,31 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
         g["phrase"] = textes.get(g["id"], "")
 
     for f in filtres:
-        f["libelle"] = msg["noms_filtres"].get(f["colonne"], f["colonne"])
+        if f["colonne"] != "mois":
+            f["libelle"] = msg["noms_filtres"].get(f["colonne"], f["colonne"])
 
-    pistes = [str(p) for p in (plan.get("pistes") or [])
-              if isinstance(p, str) and not nombres_du_texte(p) and not re.search(MOTS_DE_CAUSE, p, re.I)][:2]
+    # Un indicateur calculé par Python et recalculé à chaque filtre : la moyenne de la mesure
+    kpi = []
+    mesure = desc["mesure_principale"]
+    if mesure in gardees and pd.api.types.is_numeric_dtype(df[mesure]):
+        sql = f'SELECT ROUND(AVG("{mesure.replace(chr(34), chr(34) * 2)}"), 2) AS valeur FROM donnees'
+        r = executer_requete(chemin_propre, sql, None, colonnes_calculees)
+        if r["ok"] and r["lignes"] and isinstance(r["lignes"][0][0], (int, float)):
+            kpi.append({"id": "k0", "titre": msg["nom_mesure"] or f"Moyenne de {mesure}", "format": "nombre",
+                        "unite": desc["unite_mesure"] or "", "valeur": r["lignes"][0][0], "sql": sql,
+                        "colonne": mesure, "sans_base": True})
+
+    pistes = [p for p in (plan.get("pistes") or []) if isinstance(p, str) and p.strip() and not nombres_du_texte(p)][:2]
+    pistes = [p for p in sans_cause(pistes) if not re.search(MOTS_DE_CAUSE, p, re.I)]
     dashboard = {
         "version": 2,
         "comprehension": {"question_centrale": question, "sujet": desc["description_jeu"],
                           "colonne_principale": desc["mesure_principale"]},
         "description": {"description_jeu": desc["description_jeu"], "colonnes": desc["colonnes"]},
-        "colonnes_calculees": [],
-        # Les chiffres clés d'Atlas (contrôlés) : des textes, avec les vrais noms
-        "kpi": [{"id": f"k{i}", "titre": k["titre"], "valeur": k["valeur"], "detail": k["detail"], "texte": True}
-                for i, k in enumerate(msg["chiffres_cles"], 1)],
+        "colonnes_calculees": colonnes_calculees,
+        # La moyenne recalculée à chaque filtre, puis les chiffres clés d'Atlas (contrôlés), avec les vrais noms
+        "kpi": kpi + [{"id": f"k{i}", "titre": k["titre"], "valeur": k["valeur"], "detail": k["detail"], "texte": True}
+                      for i, k in enumerate(msg["chiffres_cles"][:2 if kpi else 3], 1)],
         "graphiques": graphiques,
         "filtres": filtres,
         "conclusion": msg["reponse"],
