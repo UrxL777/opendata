@@ -2,7 +2,7 @@ import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
-import { formaterNombre } from '../../utilitaires/formatDashboard'
+import { formaterNombre, libelleValeur } from '../../utilitaires/formatDashboard'
 
 // Les couleurs viennent de index.css : le bleu d'OpenData puis 5 couleurs qui s'accordent avec lui, toujours dans le même ordre
 const COULEURS = [1, 2, 3, 4, 5, 6].map(i => `var(--color-graphique-${i})`)
@@ -15,8 +15,13 @@ const COULEUR_TEXTE_AXE = 'var(--color-texte-doux)'
 // Fin de l'axe des valeurs : la plus petite valeur ronde égale ou juste au-dessus du maximum affiché
 // (note max 4,8 → 5 ; prix max 11 568 → 12 000), avec des graduations régulières faciles à lire.
 const VALEURS_RONDES = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
-function axeArrondi(maximum) {
+function axeArrondi(maximum, entiers = false) {
   if (!(maximum > 0)) return null
+  if (entiers && maximum <= 10) {
+    // Petits comptages : 0, 1, 2… sans graduation à virgule
+    const fin = Math.ceil(maximum)
+    return { domaine: [0, fin], graduations: Array.from({ length: fin + 1 }, (_, i) => i) }
+  }
   const ordre = 10 ** Math.floor(Math.log10(maximum))
   const fin = VALEURS_RONDES.map(v => v * ordre).find(v => v >= maximum - 1e-9)
   const pasRond = p => VALEURS_RONDES.some(v => Math.abs(p / 10 ** Math.floor(Math.log10(p)) - v) < 1e-9 && [1, 2, 2.5, 3, 5].includes(v))
@@ -50,7 +55,7 @@ function couperEnLignes(texte, max) {
 
 // Graduation sous l'axe horizontal : le nom sur plusieurs lignes, centré sous la barre
 function GraduationBas({ x, y, payload, max }) {
-  const lignes = couperEnLignes(payload.value, max)
+  const lignes = couperEnLignes(libelleValeur(payload.value), max)
   return (
     <text x={x} y={y + 12} textAnchor="middle" fontSize={12} fill={COULEUR_TEXTE_AXE}>
       {lignes.map((l, i) => <tspan key={i} x={x} dy={i === 0 ? 0 : 14}>{l}</tspan>)}
@@ -60,7 +65,7 @@ function GraduationBas({ x, y, payload, max }) {
 
 // Graduation à gauche (barres horizontales) : le nom sur plusieurs lignes, centré sur la barre
 function GraduationGauche({ x, y, payload, max }) {
-  const lignes = couperEnLignes(payload.value, max)
+  const lignes = couperEnLignes(libelleValeur(payload.value), max)
   return (
     <text x={x - 6} y={y - ((lignes.length - 1) * 14) / 2 + 4} textAnchor="end" fontSize={12} fill={COULEUR_TEXTE_AXE}>
       {lignes.map((l, i) => <tspan key={i} x={x - 6} dy={i === 0 ? 0 : 14}>{l}</tspan>)}
@@ -118,7 +123,7 @@ function Bulle({ active, payload, label, graphique, effectifMin }) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-fond border border-bordure rounded-lg shadow-sm px-3 py-2 text-xs">
-      <p className="font-semibold text-texte mb-1">{label ?? payload[0]?.payload?.x}</p>
+      <p className="font-semibold text-texte mb-1">{libelleValeur(label ?? payload[0]?.payload?.x)}</p>
       {payload.map((p, i) => {
         const nb = graphique.serie ? p.payload[`nb_${p.name}`] : p.payload.nb
         return (
@@ -187,7 +192,8 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
   const marges = { top: 8, right: 12, bottom: 34, left: 8 }
   // Plus grande valeur affichée (toutes séries) et axe arrondi ; s'il y a des valeurs négatives, l'axe reste automatique
   const valeurs = donnees.flatMap(d => (series.length ? series.map(s => d[`v_${s}`]) : [d.y])).filter(v => typeof v === 'number')
-  const axe = valeurs.length && Math.min(...valeurs) >= 0 ? axeArrondi(Math.max(...valeurs)) : null
+  const entiers = valeurs.length > 0 && valeurs.every(v => Number.isInteger(v))
+  const axe = valeurs.length && Math.min(...valeurs) >= 0 ? axeArrondi(Math.max(...valeurs), entiers) : null
   const echelle = axe ? { domain: axe.domaine, ticks: axe.graduations, interval: 0 } : {}
   const hauteurAxeBas = 22 + (lignesBas - 1) * 14
 
@@ -208,7 +214,8 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
     rendu = (
       <LineChart data={donnees} margin={marges}>
         <CartesianGrid stroke={COULEUR_GRILLE} vertical={false} />
-        <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(v, 12)} label={labelX} padding={{ left: 24, right: 24 }} />
+        <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(libelleValeur(v), 12)} label={labelX} padding={{ left: 24, right: 24 }}
+          interval={donnees.length > 12 ? Math.ceil(donnees.length / (compact ? 5 : 8)) - 1 : 0} />
         <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} {...echelle} />
         {bulle}
         {series.length ? (
@@ -217,7 +224,8 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
             {series.map((s, i) => <Line key={s} name={s} dataKey={`v_${s}`} stroke={COULEURS[i % COULEURS.length]} strokeWidth={2} dot={{ r: 4, fill: COULEURS[i % COULEURS.length] }} />)}
           </>
         ) : (
-          <Line dataKey="y" name={graphique.libelle_y} stroke={couleurGraphique} strokeWidth={2} dot={{ r: 4, fill: couleurGraphique }} />
+          <Line dataKey="y" name={graphique.libelle_y} stroke={couleurGraphique} strokeWidth={2}
+            dot={donnees.length > 24 ? false : { r: 4, fill: couleurGraphique }} />
         )}
       </LineChart>
     )
