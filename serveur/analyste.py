@@ -227,7 +227,7 @@ MOTS_DE_CAUSE = (r"\b(influenc\w*|impact\w*|détermin\w*|facteur\w*|à cause|en 
                  r"expliqu\w*|entraîn\w*|provoqu\w*|due?s? à|culturel\w*|législati\w*|coût de la vie)\b")
 REMPLACEMENTS_QUESTION = {r"\bexpliquent\b": "vont de pair avec", r"\bexplique\b": "va de pair avec",
                           r"\bdéterminent\b": "vont de pair avec", r"\bdétermine\b": "va de pair avec",
-                          r"\bl'influence\b": "le lien", r"\bl'impact\b": "le lien", r"\bimpact\b": "lien", r"\bfacteurs\b": "caractéristiques",
+                          r"\bl['’]influence\b": "le lien", r"\bl['’]impact\b": "le lien", r"\bimpact\b": "lien", r"\bfacteurs\b": "caractéristiques",
                           r"\bfacteur\b": "caractéristique", r"\binfluencent\b": "vont de pair avec",
                           r"\binfluence\b": "va de pair avec", r"\bimpactent\b": "vont de pair avec",
                           r"\bimpacte\b": "va de pair avec", r"\bQuels caractéristiques\b": "Quelles caractéristiques"}
@@ -300,8 +300,8 @@ def _phrase_acceptable(phrase: str, autorises: set) -> bool:
 def neutraliser(texte: str) -> str:
     """« l'impact du nombre d'escales sur le prix » → « le lien entre le nombre d'escales et le prix »."""
     articles = {"du": "le ", "de la": "la ", "des": "les ", "de l'": "l'", "de": "", "d'": ""}
-    texte = re.sub(r"\b(?:l'|un |une )?(?:impact|influence|effet)s? (du|de la|des|de l'|de|d')\s?(.+?) sur ",
-                   lambda m: f"le lien entre {articles[m.group(1)]}{m.group(2)} et ", texte, flags=re.I)
+    texte = re.sub(r"\b(?:l['’]|un |une )?(?:impact|influence|effet)s? (du|de la|des|de l['’]|de|d['’])\s?(.+?) sur ",
+                   lambda m: f"le lien entre {articles[m.group(1).replace('’', "'")]}{m.group(2)} et ", texte, flags=re.I)
     for motif, neutre in REMPLACEMENTS_QUESTION.items():
         texte = re.sub(motif, neutre, texte, flags=re.I)
     return texte
