@@ -407,7 +407,8 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
     # Les filtres : des colonnes de groupes gardées par Atlas (2 à 15 valeurs)
     filtres = []
     for c in utiles:
-        if c["type"] == "texte" and 2 <= c["valeurs_differentes"] <= 15:
+        # Un filtre n'a de sens que si ses valeurs reviennent sur plusieurs lignes
+        if c["type"] == "texte" and 2 <= c["valeurs_differentes"] <= 15 and c["valeurs_differentes"] <= profil["nb_lignes"] / 2:
             valeurs = _valeurs_filtre(chemin_propre, c["nom"], [])
             if valeurs:
                 filtres.append({"colonne": c["nom"], "valeurs": valeurs, "libelle": c["nom"]})
