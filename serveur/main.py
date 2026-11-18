@@ -15,8 +15,9 @@ from modules.nettoyeur import nettoyer
 from modules.rapport import generer_rapport
 from modules.comparateur import comparer, memes_colonnes
 from modules.requetes import executer_requete
-from agent import suggerer as agent_suggerer, chat as agent_chat, analyser_dataset, mettre_en_forme_resultat, \
+from agent import suggerer as agent_suggerer, chat as agent_chat, mettre_en_forme_resultat, \
     choisir_traitement_manquants, base_du_kpi
+from analyste import analyser_dataset
 
 load_dotenv()
 
@@ -604,6 +605,8 @@ def filtrer_dashboard(requete: RequeteFiltre):
 
     kpi = []
     for k in contenu.get("kpi") or []:
+        if not k.get("sql"):
+            continue  # chiffre clé écrit par Atlas : il décrit le fichier complet, il n'est pas recalculé
         r = executer_requete(chemin, k["sql"], filtres, colonnes_calculees)
         kpi.append({"id": k["id"], "valeur": r["lignes"][0][0] if r["ok"] and r["lignes"] else None,
                     **base_du_kpi(chemin, k.get("colonne"), filtres, colonnes_calculees)})

@@ -15,8 +15,13 @@ const COULEUR_TEXTE_AXE = 'var(--color-texte-doux)'
 // Fin de l'axe des valeurs : la plus petite valeur ronde égale ou juste au-dessus du maximum affiché
 // (note max 4,8 → 5 ; prix max 11 568 → 12 000), avec des graduations régulières faciles à lire.
 const VALEURS_RONDES = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
-function axeArrondi(maximum) {
+function axeArrondi(maximum, entiers = false) {
   if (!(maximum > 0)) return null
+  if (entiers && maximum <= 10) {
+    // Petits comptages : 0, 1, 2… sans graduation à virgule
+    const fin = Math.ceil(maximum)
+    return { domaine: [0, fin], graduations: Array.from({ length: fin + 1 }, (_, i) => i) }
+  }
   const ordre = 10 ** Math.floor(Math.log10(maximum))
   const fin = VALEURS_RONDES.map(v => v * ordre).find(v => v >= maximum - 1e-9)
   const pasRond = p => VALEURS_RONDES.some(v => Math.abs(p / 10 ** Math.floor(Math.log10(p)) - v) < 1e-9 && [1, 2, 2.5, 3, 5].includes(v))
@@ -187,7 +192,8 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
   const marges = { top: 8, right: 12, bottom: 34, left: 8 }
   // Plus grande valeur affichée (toutes séries) et axe arrondi ; s'il y a des valeurs négatives, l'axe reste automatique
   const valeurs = donnees.flatMap(d => (series.length ? series.map(s => d[`v_${s}`]) : [d.y])).filter(v => typeof v === 'number')
-  const axe = valeurs.length && Math.min(...valeurs) >= 0 ? axeArrondi(Math.max(...valeurs)) : null
+  const entiers = valeurs.length > 0 && valeurs.every(v => Number.isInteger(v))
+  const axe = valeurs.length && Math.min(...valeurs) >= 0 ? axeArrondi(Math.max(...valeurs), entiers) : null
   const echelle = axe ? { domain: axe.domaine, ticks: axe.graduations, interval: 0 } : {}
   const hauteurAxeBas = 22 + (lignesBas - 1) * 14
 
@@ -208,7 +214,8 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
     rendu = (
       <LineChart data={donnees} margin={marges}>
         <CartesianGrid stroke={COULEUR_GRILLE} vertical={false} />
-        <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(v, 12)} label={labelX} padding={{ left: 24, right: 24 }} />
+        <XAxis dataKey="x" tick={axeTexte} tickFormatter={v => raccourcir(v, 12)} label={labelX} padding={{ left: 24, right: 24 }}
+          interval={donnees.length > 12 ? Math.ceil(donnees.length / (compact ? 5 : 8)) - 1 : 0} />
         <YAxis tick={axeTexte} tickFormatter={formaterAxe} label={labelY} width={64} {...echelle} />
         {bulle}
         {series.length ? (
@@ -217,7 +224,8 @@ export default function GraphiqueDashboard({ graphique, resultat, numero, effect
             {series.map((s, i) => <Line key={s} name={s} dataKey={`v_${s}`} stroke={COULEURS[i % COULEURS.length]} strokeWidth={2} dot={{ r: 4, fill: COULEURS[i % COULEURS.length] }} />)}
           </>
         ) : (
-          <Line dataKey="y" name={graphique.libelle_y} stroke={couleurGraphique} strokeWidth={2} dot={{ r: 4, fill: couleurGraphique }} />
+          <Line dataKey="y" name={graphique.libelle_y} stroke={couleurGraphique} strokeWidth={2}
+            dot={donnees.length > 24 ? false : { r: 4, fill: couleurGraphique }} />
         )}
       </LineChart>
     )

@@ -148,10 +148,13 @@ def texte_dashboard(dashboard: dict) -> str:
     c = dashboard.get("comprehension") or {}
     lignes = [
         "DASHBOARD AUTOMATIQUE (c'est toi, Atlas, qui l'as construit dans ton rôle d'analyste ; tous les chiffres viennent de calculs sur le fichier complet) :",
-        f"- Sujet : {c.get('sujet', '')} Une ligne = {c.get('une_ligne_represente', '')}.",
+        f"- Sujet : {c.get('sujet', '')}",
         f"- Question centrale : {c.get('question_centrale', '')}",
         f"- Colonne principale étudiée : {c.get('colonne_principale', '')}",
     ]
+    # Description de chaque colonne (gardée ou non pour l'analyse), écrite par Atlas
+    for col in (dashboard.get("description") or {}).get("colonnes") or []:
+        lignes.append(f"- Colonne « {col['nom']} » ({'utilisée' if col.get('gardee') else 'non utilisée'} pour l'analyse) : {col.get('description', '')}")
     for col in dashboard.get("colonnes_calculees") or []:
         lignes.append(f"- Colonne calculée « {col['nom']} » : {col.get('explication', '')}")
     if dashboard.get("classement_facteurs"):
@@ -160,7 +163,7 @@ def texte_dashboard(dashboard: dict) -> str:
             + ("" if f.get("important") else ", peu important")
             for f in dashboard["classement_facteurs"]))
     for k in dashboard.get("kpi") or []:
-        lignes.append(f"- Indicateur « {k['titre']} » : {k['valeur']} {k.get('unite', '')}".rstrip())
+        lignes.append(f"- Chiffre clé « {k['titre']} » : {k['valeur']} {k.get('unite') or k.get('detail') or ''}".rstrip())
     for i, g in enumerate(dashboard.get("graphiques") or [], 1):
         res = g.get("resultat") or {}
         donnees = "; ".join(
@@ -172,6 +175,8 @@ def texte_dashboard(dashboard: dict) -> str:
         lignes.append("- Filtres disponibles : " + ", ".join(f["colonne"] for f in dashboard["filtres"]))
     if dashboard.get("conclusion"):
         lignes.append(f"- Conclusion générale : {dashboard['conclusion']}")
+    for piste in dashboard.get("pistes") or []:
+        lignes.append(f"- Piste d'analyse proposée : {piste}")
     return "\n".join(lignes)
 
 
@@ -375,24 +380,9 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  L'ANALYSTE : création automatique d'un dashboard pour chaque jeu de données
-#  Le modèle ne voit jamais les données : il lit la fiche d'identité, écrit du SQL,
-#  le serveur l'exécute (modules/requetes.py) et lui rend seulement les résultats.
+#  Outils partagés avec l'Analyste (analyste.py) : fiche allégée, appel au modèle,
+#  mise en forme des résultats SQL, filtres et devises.
 # ═══════════════════════════════════════════════════════════════════════════════
-
-MAX_KPI = 4             # indicateurs clés au maximum
-MAX_GRAPHIQUES = 6      # graphiques au maximum
-MAX_FILTRES = 4         # filtres au maximum
-MAX_ESSAIS = 3          # essais pour corriger une requête qui échoue
-EFFECTIF_MIN = 30       # en dessous, un groupe est trop petit pour être fiable
-
-
-def effectif_minimum(nb_lignes: int) -> int:
-    """Taille minimale d'un groupe fiable : 30, ou moins pour un petit fichier (un dixième des lignes, au moins 2)."""
-    return min(EFFECTIF_MIN, max(2, nb_lignes // 10))
-SEUIL_IMPORTANCE = 0.15 # un facteur est important si son écart vaut au moins 15 % de celui du premier
-MAX_TOKENS_REPONSE = 3500  # tokens réservés pour chaque réponse (l'offre gratuite de Groq limite à 8 000 par minute)
-
 
 def _reduire_fiche(fiche: dict, niveau: int, avec_exemples: bool) -> dict:
     """
@@ -499,94 +489,6 @@ def choisir_traitement_manquants(fiche: dict) -> dict:
     return decision
 
 
-TYPES_GRAPHIQUES ={"barres", "barres_horizontales", "barres_groupees", "courbe", "camembert"}
-
-PROMPT_ANALYSTE_ROLE = """Tu es Atlas, l'assistant data analyst de la plateforme OpenData, dans ton rôle d'analyste : tu construis automatiquement un dashboard pour chaque jeu de données publié, comme un data analyst expérimenté.
-Tu ne vois jamais les données elles-mêmes : tu reçois leur fiche d'identité (colonnes, rôles, statistiques, lignes d'exemple). Tu écris des requêtes SQL (DuckDB) que le serveur exécute sur le fichier complet, puis tu interprètes les résultats.
-
-Règles générales :
-- Tu réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après.
-- Tous les textes (titres, phrases) sont en français, courts, compréhensibles par quelqu'un qui n'est pas data analyst.
-- Tu n'inventes jamais de colonne ni de chiffre."""
-
-PROMPT_COMPRENDRE = PROMPT_ANALYSTE_ROLE + """
-
-ÉTAPE 1 : COMPRENDRE LE JEU DE DONNÉES.
-À partir de la fiche, détermine :
-1. "sujet" : de quoi parle le jeu de données, en une phrase.
-2. "une_ligne_represente" : ce que représente une ligne (un assuré, une vente, un jour de météo…).
-3. "colonne_principale" : la colonne que l'on cherche à expliquer, celle qui intéresse le plus un décideur (frais, ventes, note, prix, résultat…). C'est le nom EXACT d'une colonne de la fiche. De préférence une colonne quantitative ; s'il n'y en a aucune de pertinente, une colonne catégorielle (ex. la couleur choisie, la présence de pluie).
-4. "valeur_cible" : seulement si la colonne principale est catégorielle, la valeur qui intéresse le plus, écrite exactement comme dans la fiche (ex. "rain", "oui"). Sinon null.
-5. "question_centrale" : LA question à laquelle le dashboard va répondre (ex. « Qu'est-ce qui fait varier les frais d'assurance ? »).
-6. "colonnes_calculees" : comme les colonnes calculées de Power BI, pour regrouper en catégories lisibles :
-   - Chaque colonne quantitative qui peut expliquer la colonne principale (âge, IMC, revenu, température…) est transformée en 3 à 6 tranches lisibles. Si une norme officielle existe, utilise-la (ex. IMC selon l'OMS : moins de 18.5 Sous-poids, moins de 25 Poids normal, moins de 30 Surpoids, sinon Obésité). Sinon, des tranches simples qui s'appuient sur le min et le max de la fiche (ex. âge : 18-25, 26-40, 41-55, 56-64).
-   - Une colonne catégorielle qui a des groupes rares (moins de 30 lignes : regarde les pourcentages de la fiche et le nombre de lignes) est regroupée (ex. enfants : 0, 1, 2, « 3 et plus » ; ou « Autres » pour les valeurs rares).
-   - Une colonne date peut donner une colonne de période : strftime("date", '%Y-%m') pour le mois, ou CAST(year("date") AS VARCHAR) pour l'année.
-   - Format : {"nom": "categorie_imc", "expression": "CASE WHEN \\"bmi\\" < 18.5 THEN '1. Sous-poids' WHEN \\"bmi\\" < 25 THEN '2. Poids normal' WHEN \\"bmi\\" < 30 THEN '3. Surpoids' ELSE '4. Obésité' END", "explication": "Catégories d'IMC selon l'OMS"}
-   - "nom" : lettres sans accent, chiffres et _ uniquement (ex. categorie_age), différent des colonnes existantes. "expression" : une formule SQL DuckDB (CASE WHEN, strftime, year…), sans SELECT ni FROM. Les noms de colonnes entre guillemets doubles.
-   - Les libellés des tranches doivent se trier dans le bon ordre (ex. '18-25', '26-40' ou '1. Sous-poids', '2. Poids normal').
-7. "facteurs" : la liste des colonnes qui peuvent expliquer la colonne principale (colonnes catégorielles existantes ou colonnes calculées). Chaque facteur a entre 2 et 15 groupes. N'y mets pas les identifiants, le texte libre, les coordonnées géographiques (latitude, longitude), ni la colonne principale, ni une colonne calculée à partir de la colonne principale (une colonne ne s'explique pas par elle-même). Pour une colonne quantitative, mets sa version en tranches. Ne mets jamais à la fois une colonne et sa version calculée : choisis la plus lisible.
-   Un facteur est une CARACTÉRISTIQUE (quoi, qui, où, quand : type de produit, catégorie, lieu, période, profil…), jamais une autre mesure du même phénomène (ex. pour expliquer les ventes au détail, n'utilise pas les ventes en entrepôt ni les transferts : ce sont d'autres mesures de la même activité).
-   Si le fichier a une colonne par année ou par période (ex. colonnes 2010, 2011, 2012…), c'est un format « large » : la question centrale porte sur l'évolution dans le temps et sur les écarts entre groupes (continent, catégorie…) ; une année n'explique jamais une autre année.
-
-Réponds avec ce JSON :
-{"sujet": "...", "une_ligne_represente": "...", "colonne_principale": "...", "valeur_cible": null, "question_centrale": "...", "colonnes_calculees": [...], "facteurs": ["...", "..."]}"""
-
-PROMPT_QUESTIONNER = PROMPT_ANALYSTE_ROLE + """
-
-ÉTAPE 2 : CHOISIR LES CALCULS DU DASHBOARD.
-Tu reçois ta compréhension du jeu de données, tes colonnes calculées, la fiche, et le CLASSEMENT DES FACTEURS calculé par le serveur sur tout le fichier : pour chaque facteur, l'écart de la colonne principale entre le groupe le plus haut et le plus bas. Plus l'écart est grand, plus le facteur compte. Le champ "important" vaut true pour les facteurs qui comptent vraiment : ce sont les SEULS facteurs à étudier dans les graphiques.
-
-Construis un dashboard COHÉRENT qui répond à la question centrale. Les graphiques ne sont pas indépendants : ils racontent une histoire, du général au détail, et aident à prendre une décision.
-- "kpi" : 2 à 4 indicateurs clés (ex. nombre total, moyenne de la colonne principale, part d'un groupe important). Chaque KPI : {"titre": "...", "colonne": "nom exact de la colonne mesurée (ex. la colonne principale pour une moyenne), ou null si le KPI compte simplement des lignes", "sql": "requête qui rend UNE seule ligne et UNE seule valeur"}.
-- "graphiques" : 3 à 6 graphiques au maximum, par ordre d'importance :
-  1. le facteur le plus important (la colonne principale comparée entre ses groupes) ;
-  2. les autres facteurs marqués "important": true, un graphique chacun ;
-  3. au moins un CROISEMENT des deux facteurs les plus importants (ex. frais par tranche d'âge, une série pour les fumeurs et une pour les non-fumeurs) : c'est souvent là que se trouve le vrai message ;
-  4. s'il y a une colonne de période : l'évolution dans le temps ;
-  5. éventuellement la répartition de la colonne principale (par tranches).
-  JAMAIS de graphique sur un facteur marqué "important": false, même pour remplir.
-  Chaque graphique : {"id": "g1", "question": "...", "pourquoi": "...", "famille": "comparaison" | "croisement" | "evolution" | "repartition" | "composition" | "classement" | "relation", "sql": "..."}.
-- Les filtres du dashboard sont choisis par le serveur (les facteurs importants) : tu n'as pas à les donner.
-
-Règles SQL (DuckDB) :
-- Une seule table : donnees. Elle contient les colonnes de la fiche ET tes colonnes calculées (utilise-les directement par leur nom).
-- Noms de colonnes entre guillemets doubles, exactement comme dans la fiche (ex. "Wind_Speed").
-- Une seule requête SELECT (ou WITH) par graphique ou KPI, sans point-virgule.
-- Toujours résumer (GROUP BY, AVG, SUM, COUNT) : au maximum 50 lignes de résultat. Les dates sont regroupées par mois ou par année.
-- Pour chaque groupe, ajoute TOUJOURS une colonne nb = COUNT(*).
-- Arrondis : ROUND(..., 0) pour les montants, ROUND(..., 1) pour les pourcentages et les petites valeurs.
-- Trie les résultats de façon lisible (ordre des tranches, ou du plus grand au plus petit).
-- Pour un croisement : une ligne par combinaison, avec le facteur 1, le facteur 2, la valeur et nb. Le facteur 2 (celui des séries) a au plus 5 groupes : choisis un facteur qui a peu de groupes, ou une version regroupée.
-- Si la colonne principale est catégorielle, la valeur étudiée est le pourcentage de la valeur cible : ROUND(100.0 * AVG(CASE WHEN "colonne" = 'valeur' THEN 1 ELSE 0 END), 1) AS pct_valeur.
-- Ne parle jamais du fichier lui-même (lignes supprimées, valeurs manquantes) : c'est le rôle du rapport de nettoyage.
-
-Réponds avec ce JSON :
-{"kpi": [...], "graphiques": [...]}"""
-
-PROMPT_CORRIGER = """Certaines requêtes ont échoué lors de l'exécution. Voici les erreurs renvoyées par DuckDB.
-Réécris UNIQUEMENT les requêtes concernées en corrigeant l'erreur (vérifie les noms exacts des colonnes et la syntaxe DuckDB).
-Réponds avec ce JSON : {"corrections": [{"id": "...", "sql": "..."}]}. Si une requête ne peut pas être corrigée, ne la mets pas."""
-
-PROMPT_PRESENTER = PROMPT_ANALYSTE_ROLE + """
-
-ÉTAPE 3 : PRÉSENTER LE DASHBOARD.
-Tu reçois les résultats RÉELS de tes calculs (colonnes et lignes). Pour chacun, décide comment l'afficher et écris la conclusion.
-- UNITÉS ET DEVISES : n'invente jamais une devise ou une unité. Utilise-la seulement si elle est écrite dans le titre, la description ou le nom d'une colonne (ex. « charges en dollars », « prix_eur »). Sinon, n'écris aucune devise : « 32 050 » et non « 32 050 € ».
-- "kpi" : pour chaque KPI (même id) : {"id": "k1", "titre": "titre court", "format": "nombre" | "monnaie" | "pourcentage", "unite": "unité certaine, ou chaîne vide"}.
-- "graphiques" : pour chaque graphique (même id) : {"id": "g1", "titre": "titre court", "type": "barres" | "barres_horizontales" | "barres_groupees" | "courbe" | "camembert", "x": "...", "y": "...", "serie": "..." ou null, "libelle_x": "...", "libelle_y": "...", "libelle_serie": "..." ou null, "phrase": "..."}.
-  - "x" : la colonne du résultat pour l'axe horizontal (ou les catégories) ; "y" : la colonne de la valeur ; "serie" : la colonne qui sépare les séries (seulement pour barres_groupees, ou une courbe à plusieurs séries), sinon null. Ce sont des noms qui existent EXACTEMENT dans le résultat du graphique. "y" n'est jamais "nb", sauf si le graphique compte des éléments.
-  - "libelle_x", "libelle_y", "libelle_serie" : les noms lisibles à afficher sur le graphique (ex. « Tranche d'âge », « Frais moyens », « Fumeur »).
-  - Choix du type : comparer des groupes → barres ; beaucoup de groupes ou des noms longs → barres_horizontales ; croisement de deux facteurs → barres_groupees (ou courbe si le premier facteur est ordonné : tranches, mois) ; évolution dans le temps → courbe ; parts d'un tout avec 6 parts au maximum → camembert.
-  - "phrase" : une ou deux phrases de conclusion avec les vrais chiffres du résultat. Pas de cause affirmée (écris « sont plus élevés chez », jamais « causent »). Ne compare jamais en citant un groupe dont nb est inférieur à 30 sans préciser entre parenthèses qu'il ne compte que ce petit nombre de lignes.
-- "conclusion" : 2 à 3 phrases qui répondent à la question centrale, comme un analyste qui présente son dashboard à un décideur.
-- "ordre" : la liste des id des graphiques dans l'ordre d'affichage (du général au détail).
-- "libelles_filtres" : pour chaque filtre reçu, un nom court et lisible en français à afficher sur le bouton (ex. {"smoker": "Fumeur", "categorie_age": "Tranche d'âge"}). La clé est le nom EXACT de la colonne du filtre.
-
-Réponds avec ce JSON :
-{"kpi": [...], "graphiques": [...], "conclusion": "...", "ordre": ["g1", "..."], "libelles_filtres": {"colonne": "Nom lisible"}}"""
-
-
 def _attente_limite(erreur: Exception) -> float | None:
     """
     Si Groq refuse parce que la limite de tokens par minute est atteinte (erreur 429),
@@ -599,6 +501,12 @@ def _attente_limite(erreur: Exception) -> float | None:
     if not delai:
         return 20.0
     return int(delai.group(1) or 0) * 3600 + int(delai.group(2) or 0) * 60 + float(delai.group(3)) + 1
+
+
+def _taille_reponse(messages: list[dict]) -> int:
+    """Groq compte l'entrée + la réponse maximale dans sa limite par minute : la réponse s'adapte à l'entrée."""
+    entree = sum(len(str(m.get("content", ""))) for m in messages) // 3
+    return max(1500, min(4500, 7600 - entree))
 
 
 def _appeler_analyste(messages: list[dict], etape: str) -> dict:
@@ -614,7 +522,7 @@ def _appeler_analyste(messages: list[dict], etape: str) -> dict:
             reponse = client.chat.completions.create(
                 model=MODELE_ANALYSTE,
                 messages=messages_envoyes,
-                max_tokens=MAX_TOKENS_REPONSE,
+                max_tokens=_taille_reponse(messages_envoyes),
                 temperature=0.2,
                 response_format={"type": "json_object"},
             )
@@ -647,77 +555,6 @@ def _appeler_analyste(messages: list[dict], etape: str) -> dict:
                 "role": "system",
                 "content": "Rappel : tu n'as accès à aucun outil. Réponds uniquement avec un objet JSON valide, sans texte autour.",
             }]
-
-
-def _colonnes_calculees_valides(chemin: str, proposees: list) -> list:
-    """Garde seulement les colonnes calculées qui fonctionnent et donnent au moins 2 groupes."""
-    valides = []
-    for colonne in proposees or []:
-        if not isinstance(colonne, dict):
-            continue
-        nom = str(colonne.get("nom", ""))
-        essai = executer_requete(chemin, f'SELECT COUNT(DISTINCT "{nom}") AS n FROM donnees', None, valides + [colonne])
-        if essai["ok"] and essai["lignes"] and (essai["lignes"][0][0] or 0) >= 2:
-            valides.append({"nom": nom, "expression": colonne["expression"], "explication": colonne.get("explication", "")})
-        else:
-            print(f"[ANALYSTE] Colonne calculée '{nom}' écartée : {essai.get('erreur', 'moins de 2 groupes')}")
-    return valides
-
-
-def _classer_facteurs(chemin: str, comprehension: dict, colonnes_calculees: list, roles: dict,
-                      effectif_min: int) -> list:
-    """
-    Le serveur MESURE l'importance de chaque facteur (sans IA) : l'écart de la colonne principale
-    entre le groupe le plus haut et le plus bas, sur tout le fichier. Les groupes de moins de
-    effectif_min lignes sont ignorés pour ne pas tirer de conclusion d'un petit groupe.
-    """
-    principale = comprehension["colonne_principale"]
-    cible = comprehension.get("valeur_cible")
-    p = '"' + principale.replace('"', '""') + '"'
-    if roles.get(principale) == "quantitative":
-        valeur, unite = f"AVG({p})", "moyenne"
-    else:
-        cible_sql = "'" + str(cible).replace("'", "''") + "'"
-        valeur, unite = f"100.0 * AVG(CASE WHEN CAST({p} AS VARCHAR) = {cible_sql} THEN 1 ELSE 0 END)", "pourcentage"
-
-    noms_possibles = set(roles) | {c["nom"] for c in colonnes_calculees}
-    # Une colonne calculée à partir de la colonne principale ne peut pas l'expliquer (raisonnement circulaire)
-    motif_principale = re.compile(r'(?<![\w"])"?' + re.escape(principale) + r'"?(?![\w"])')
-    derivees = {c["nom"] for c in colonnes_calculees if motif_principale.search(c["expression"])}
-    # Des coordonnées GPS en tranches n'ont pas de sens pour un décideur : on les écarte
-    motif_coordonnees = re.compile(r"(^|[^a-z])(lat|lon|lng|latitude|longitude|coord|coordonnees|gps)([^a-z]|$)", re.IGNORECASE)
-    expressions = {c["nom"]: c["expression"] for c in colonnes_calculees}
-    classement = []
-    for facteur in comprehension.get("facteurs") or []:
-        if facteur not in noms_possibles or facteur == principale or facteur in derivees:
-            continue
-        if motif_coordonnees.search(str(facteur)) or motif_coordonnees.search(expressions.get(facteur, "").replace('"', " ")):
-            print(f"[ANALYSTE] Facteur '{facteur}' écarté : coordonnées géographiques")
-            continue
-        f = '"' + str(facteur).replace('"', '""') + '"'
-        sql = (f"SELECT {f} AS groupe, ROUND({valeur}, 2) AS valeur, COUNT(*) AS nb FROM donnees "
-               f"WHERE {f} IS NOT NULL AND {p} IS NOT NULL GROUP BY 1")
-        res = executer_requete(chemin, sql, None, colonnes_calculees)
-        if not res["ok"]:
-            print(f"[ANALYSTE] Facteur '{facteur}' non mesuré : {res['erreur']}")
-            continue
-        groupes = [l for l in res["lignes"] if l[2] >= effectif_min and l[1] is not None]
-        if len(res["lignes"]) > 15 or len(groupes) < 2:
-            continue
-        haut = max(groupes, key=lambda l: l[1])
-        bas = min(groupes, key=lambda l: l[1])
-        classement.append({
-            "facteur": facteur, "ecart": round(haut[1] - bas[1], 2), "mesure": unite,
-            "groupe_le_plus_haut": haut[0], "valeur_haute": haut[1],
-            "groupe_le_plus_bas": bas[0], "valeur_basse": bas[1], "nb_groupes": len(res["lignes"]),
-        })
-    classement.sort(key=lambda c: c["ecart"], reverse=True)
-    # Un facteur est « important » si son écart vaut au moins SEUIL_IMPORTANCE de celui du premier
-    if classement:
-        plus_grand = classement[0]["ecart"] or 1
-        for c in classement:
-            c["important"] = c["ecart"] >= SEUIL_IMPORTANCE * plus_grand
-    return classement
 
 
 def mettre_en_forme_resultat(resultat: dict, x: str, serie: str | None) -> dict:
@@ -797,229 +634,6 @@ def retirer_devises_inventees(texte: str, reference: str) -> str:
         if not any(m in reference for m in mots):
             texte = re.sub(motif, "", texte, flags=re.IGNORECASE)
     return re.sub(r"\s*\(\s*\)", "", texte).strip()
-
-
-def valider_dashboard(comprehension: dict, colonnes_calculees: list, classement: list,
-                      kpi_calcules: dict, graphiques_calcules: dict, presentation: dict,
-                      filtres: list, effectif_min: int = EFFECTIF_MIN, reference: str = "") -> dict:
-    """
-    Le serveur CONTRÔLE le travail de l'Analyste avant de l'enregistrer :
-    types de graphiques autorisés, colonnes qui existent dans les résultats, limites (4 KPI,
-    6 graphiques), et les données affichées viennent UNIQUEMENT des résultats SQL.
-    """
-    # KPI : une seule valeur, venue du résultat SQL
-    kpi = []
-    for p in presentation.get("kpi") or []:
-        calcul = kpi_calcules.get(p.get("id"))
-        if not calcul or not calcul["resultat"]["lignes"]:
-            continue
-        valeur = calcul["resultat"]["lignes"][0][0]
-        if not isinstance(valeur, (int, float)) or isinstance(valeur, bool):
-            continue
-        kpi.append({
-            "id": p["id"], "titre": retirer_devises_inventees(str(p.get("titre") or calcul["titre"]), reference),
-            "format": p.get("format") if p.get("format") in ("nombre", "monnaie", "pourcentage") else "nombre",
-            "unite": retirer_devises_inventees(str(p.get("unite") or ""), reference), "valeur": valeur, "sql": calcul["sql"],
-            "colonne": calcul.get("colonne"),
-        })
-        if len(kpi) == MAX_KPI:
-            break
-
-    # Graphiques, dans l'ordre choisi par l'Analyste
-    presentations = {g.get("id"): g for g in presentation.get("graphiques") or [] if isinstance(g, dict)}
-    ordre = [i for i in (presentation.get("ordre") or []) if i in presentations]
-    ordre += [i for i in presentations if i not in ordre]
-    graphiques = []
-    for gid in ordre:
-        p, calcul = presentations[gid], graphiques_calcules.get(gid)
-        if not calcul:
-            continue
-        colonnes = calcul["resultat"]["colonnes"]
-        x, y, serie = p.get("x"), p.get("y"), p.get("serie")
-        lignes = calcul["resultat"]["lignes"]
-        if x in colonnes:
-            # Les catégories vides (ex. une date illisible) ne sont pas affichées
-            lignes = [l for l in lignes if l[colonnes.index(x)] is not None]
-        if not lignes or x not in colonnes or y not in colonnes or x == y:
-            print(f"[ANALYSTE] Graphique {gid} écarté : axes invalides ({x}, {y}) pour {colonnes}")
-            continue
-
-        def numerique(colonne):
-            valeurs = [l[colonnes.index(colonne)] for l in lignes if l[colonnes.index(colonne)] is not None]
-            return bool(valeurs) and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in valeurs)
-
-        # La valeur (y) doit être un nombre ; si l'Analyste a inversé les axes, on les remet dans le bon sens
-        if not numerique(y):
-            if numerique(x):
-                x, y = y, x
-                lignes = [l for l in calcul["resultat"]["lignes"] if l[colonnes.index(x)] is not None]
-                p = {**p, "libelle_x": p.get("libelle_y"), "libelle_y": p.get("libelle_x")}
-            else:
-                print(f"[ANALYSTE] Graphique {gid} écarté : la valeur « {y} » n'est pas un nombre")
-                continue
-        if serie not in colonnes or serie in (x, y):
-            serie = None
-        type_graphique = p.get("type") if p.get("type") in TYPES_GRAPHIQUES else "barres"
-        if type_graphique == "barres_groupees" and not serie:
-            type_graphique = "barres"
-        if type_graphique == "camembert" and (serie or len(lignes) > 6):
-            type_graphique = "barres"
-        graphiques.append({
-            "id": gid, "titre": retirer_devises_inventees(str(p.get("titre") or calcul["question"]), reference),
-            "question": calcul["question"], "pourquoi": calcul.get("pourquoi", ""), "famille": calcul.get("famille", ""),
-            "type": type_graphique, "x": x, "y": y, "serie": serie,
-            "libelle_x": str(p.get("libelle_x") or x),
-            "libelle_y": retirer_devises_inventees(str(p.get("libelle_y") or y), reference),
-            "libelle_serie": str(p.get("libelle_serie") or serie) if serie else None,
-            "effectif": "nb" if "nb" in colonnes else None,
-            "phrase": retirer_devises_inventees(str(p.get("phrase") or ""), reference), "sql": calcul["sql"],
-            "resultat": mettre_en_forme_resultat({**calcul["resultat"], "lignes": lignes}, x, serie),
-        })
-        if len(graphiques) == MAX_GRAPHIQUES:
-            break
-
-    if not graphiques:
-        raise ValueError("Aucun graphique valide n'a pu être construit.")
-
-    # Nom lisible de chaque filtre, donné par Atlas ; à défaut, le nom de la colonne
-    libelles = presentation.get("libelles_filtres") if isinstance(presentation.get("libelles_filtres"), dict) else {}
-    filtres = [{**f, "libelle": str(libelles.get(f["colonne"]) or f["colonne"]).strip()[:40]} for f in filtres]
-
-    return {
-        "version": 1,
-        "comprehension": comprehension,
-        "colonnes_calculees": colonnes_calculees,
-        "classement_facteurs": classement,
-        "kpi": kpi,
-        "graphiques": graphiques,
-        "filtres": filtres,
-        "conclusion": retirer_devises_inventees(str(presentation.get("conclusion") or ""), reference),
-        "effectif_min": effectif_min,
-    }
-
-
-def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
-    """
-    L'Analyste : à partir de la fiche d'identité et du jeu de données propre (fichier local),
-    construit le dashboard de base. Rend le dashboard (dictionnaire prêt à enregistrer en JSON).
-    """
-    print(f"\n[ANALYSTE] ── Début de l'analyse : {fiche.get('titre') or '(sans titre)'}")
-    roles = {c["nom"]: c["role"] for c in fiche["colonnes"]}
-    fiche_json = json.dumps(fiche_compacte(fiche), ensure_ascii=False)
-
-    # Étape 1 : comprendre
-    comprehension = _appeler_analyste([
-        {"role": "system", "content": PROMPT_COMPRENDRE},
-        {"role": "user", "content": f"Fiche d'identité du jeu de données :\n{fiche_json}"},
-    ], "étape 1 (comprendre)")
-    if comprehension.get("colonne_principale") not in roles:
-        quantitatives = [n for n, r in roles.items() if r == "quantitative"]
-        categorielles = [n for n, r in roles.items() if r == "categorielle"]
-        if not quantitatives and not categorielles:
-            raise ValueError("Aucune colonne exploitable pour une analyse.")
-        comprehension["colonne_principale"] = (quantitatives or categorielles)[-1]
-    if roles[comprehension["colonne_principale"]] != "quantitative" and not comprehension.get("valeur_cible"):
-        colonne = next(c for c in fiche["colonnes"] if c["nom"] == comprehension["colonne_principale"])
-        frequentes = colonne.get("valeurs_frequentes") or [{"valeur": None}]
-        comprehension["valeur_cible"] = frequentes[0]["valeur"]
-    print(f"[ANALYSTE] Sujet : {comprehension.get('sujet')} | principale : {comprehension['colonne_principale']}")
-
-    colonnes_calculees = _colonnes_calculees_valides(chemin_propre, comprehension.pop("colonnes_calculees", []))
-    print(f"[ANALYSTE] Colonnes calculées : {[c['nom'] for c in colonnes_calculees]}")
-
-    # Le serveur mesure l'importance des facteurs
-    effectif_min = effectif_minimum(fiche.get("nb_lignes") or 0)
-    classement = _classer_facteurs(chemin_propre, comprehension, colonnes_calculees, roles, effectif_min)
-    print(f"[ANALYSTE] Classement des facteurs : {[(c['facteur'], c['ecart']) for c in classement]}")
-
-    # Étape 2 : choisir les calculs
-    messages = [
-        {"role": "system", "content": PROMPT_QUESTIONNER},
-        {"role": "user", "content": json.dumps({
-            "comprehension": comprehension, "colonnes_calculees": colonnes_calculees,
-            "classement_facteurs": classement, "fiche": fiche_compacte(fiche, avec_exemples=False, budget_tokens=2000),
-        }, ensure_ascii=False)},
-    ]
-    plan = _appeler_analyste(messages, "étape 2 (questionner)")
-
-    calculs = {}
-    for i, k in enumerate((plan.get("kpi") or [])[:MAX_KPI], 1):
-        if isinstance(k, dict) and k.get("sql"):
-            colonne = k.get("colonne")
-            noms_valides = set(roles) | {c["nom"] for c in colonnes_calculees}
-            calculs[f"k{i}"] = {"type": "kpi", "titre": k.get("titre", ""), "sql": k["sql"],
-                                "colonne": colonne if colonne in noms_valides else None}
-    for i, g in enumerate((plan.get("graphiques") or [])[:MAX_GRAPHIQUES], 1):
-        if isinstance(g, dict) and g.get("sql"):
-            calculs[f"g{i}"] = {"type": "graphique", "question": g.get("question", ""), "pourquoi": g.get("pourquoi", ""),
-                                "famille": g.get("famille", ""), "sql": g["sql"]}
-
-    # Exécution des requêtes, avec correction par l'Analyste en cas d'erreur
-    a_executer = list(calculs)
-    for essai in range(MAX_ESSAIS):
-        erreurs = {}
-        for cid in a_executer:
-            res = executer_requete(chemin_propre, calculs[cid]["sql"], None, colonnes_calculees)
-            if res["ok"] and res["lignes"] and not res["tronque"]:
-                calculs[cid]["resultat"] = res
-            elif res["ok"] and res["tronque"]:
-                erreurs[cid] = (f"Le résultat dépasse {len(res['lignes'])} lignes et a été coupé : regroupe davantage "
-                                "(par année au lieu de par mois, ou les principaux groupes seulement).")
-            else:
-                erreurs[cid] = res.get("erreur") or "Le résultat est vide."
-        print(f"[ANALYSTE] Exécution {essai + 1} : {len(a_executer) - len(erreurs)} réussie(s), {len(erreurs)} erreur(s)")
-        if not erreurs or essai == MAX_ESSAIS - 1:
-            break
-        messages += [
-            {"role": "assistant", "content": json.dumps(plan, ensure_ascii=False)},
-            {"role": "user", "content": PROMPT_CORRIGER + "\n" + json.dumps(
-                [{"id": cid, "sql": calculs[cid]["sql"], "erreur": e} for cid, e in erreurs.items()], ensure_ascii=False)},
-        ]
-        corrections = _appeler_analyste(messages, f"correction {essai + 1}")
-        a_executer = []
-        for c in corrections.get("corrections") or []:
-            if isinstance(c, dict) and c.get("id") in erreurs and c.get("sql"):
-                calculs[c["id"]]["sql"] = c["sql"]
-                a_executer.append(c["id"])
-        if not a_executer:
-            break
-
-    kpi_calcules = {cid: c for cid, c in calculs.items() if c["type"] == "kpi" and "resultat" in c}
-    graphiques_calcules = {cid: c for cid, c in calculs.items() if c["type"] == "graphique" and "resultat" in c}
-    if not graphiques_calcules:
-        raise ValueError("Aucune requête de graphique n'a réussi.")
-
-    # Les filtres : le serveur prend les facteurs importants, dans l'ordre du classement
-    filtres = []
-    for colonne in [c["facteur"] for c in classement if c.get("important")]:
-        valeurs = _valeurs_filtre(chemin_propre, colonne, colonnes_calculees)
-        if valeurs:
-            filtres.append({"colonne": colonne, "valeurs": valeurs})
-        if len(filtres) == MAX_FILTRES:
-            break
-
-    # Étape 3 : présenter
-    presentation = _appeler_analyste([
-        {"role": "system", "content": PROMPT_PRESENTER},
-        {"role": "user", "content": json.dumps({
-            "question_centrale": comprehension.get("question_centrale"), "comprehension": comprehension,
-            "kpi": [{"id": cid, "titre": c["titre"], "resultat": c["resultat"]} for cid, c in kpi_calcules.items()],
-            "graphiques": [{"id": cid, "question": c["question"], "famille": c["famille"], "resultat": c["resultat"]}
-                           for cid, c in graphiques_calcules.items()],
-            "filtres": [{"colonne": f["colonne"], "exemples_de_valeurs": [v["valeur"] for v in f["valeurs"][:5]]}
-                        for f in filtres],
-        }, ensure_ascii=False)},
-    ], "étape 3 (présenter)")
-
-    dashboard = valider_dashboard(comprehension, colonnes_calculees, classement,
-                                  kpi_calcules, graphiques_calcules, presentation, filtres, effectif_min,
-                                  reference=" ".join([fiche.get("titre") or "", fiche.get("description") or ""]
-                                                     + [c["nom"] for c in fiche["colonnes"]]))
-    for k in dashboard["kpi"]:
-        k.update(base_du_kpi(chemin_propre, k.get("colonne"), None, colonnes_calculees))
-    print(f"[ANALYSTE] ✓ Dashboard prêt : {len(dashboard['kpi'])} KPI, {len(dashboard['graphiques'])} graphiques, "
-          f"{len(dashboard['filtres'])} filtres")
-    return dashboard
 
 
 # ─── Chat principal ────────────────────────────────────────────────────────────

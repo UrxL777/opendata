@@ -32,8 +32,17 @@ function useHauteurNavigation() {
   return hauteur
 }
 
-// Carte d'un indicateur clé, avec « calculé sur N lignes » en gris
+// Carte d'un indicateur clé. Un chiffre clé écrit par Atlas (texte) : le chiffre, ce qu'il mesure, et qui / quand.
 function CarteKpi({ kpi }) {
+  if (kpi.texte) {
+    return (
+      <div className="bg-fond border border-bordure-legere rounded-xl p-3 shadow-sm">
+        <p className="text-2xl font-bold text-principal">{kpi.valeur}</p>
+        <p className="text-xs text-texte-doux mt-0.5">{kpi.titre}</p>
+        {kpi.detail && <p className="text-xs text-texte-discret mt-1">{kpi.detail}</p>}
+      </div>
+    )
+  }
   return (
     <div className="bg-fond border border-bordure-legere rounded-xl p-3 shadow-sm">
       <p className="text-2xl font-bold text-principal">{formaterKpi(kpi)}</p>
@@ -133,7 +142,8 @@ export default function Dashboard() {
   const effectifMin = contenu?.effectif_min ?? 30
 
   // Valeurs affichées : celles d'origine, ou celles recalculées pour les filtres
-  const kpiAffiches = (contenu?.kpi ?? []).map(k => {
+  const filtreActif = Object.values(choix).some(v => v.length)
+  const kpiAffiches = (contenu?.kpi ?? []).filter(k => !(k.texte && filtreActif)).map(k => {
     const r = recalcul?.kpi?.find(x => x.id === k.id)
     return r ? { ...k, valeur: r.valeur, nb: r.nb, nb_sans_valeur: r.nb_sans_valeur } : k
   })
@@ -213,6 +223,35 @@ export default function Dashboard() {
             <div className="bg-fond-bleu-clair border border-bordure-bleu-pale rounded-2xl p-4 mt-4">
               <p className="text-sm text-texte-bleu-nuit"><span className="font-semibold">Conclusion d’Atlas :</span> {contenu.conclusion}</p>
             </div>
+          )}
+
+          {contenu.pistes?.length > 0 && (
+            <div className="bg-fond border border-bordure-legere rounded-2xl p-4 mt-4">
+              <p className="text-sm font-semibold text-texte-titre mb-2">Pistes pour aller plus loin</p>
+              <ul className="list-disc pl-5 space-y-1">
+                {contenu.pistes.map((p, i) => <li key={i} className="text-sm text-texte-secondaire">{p}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {contenu.description?.colonnes?.length > 0 && (
+            <details className="bg-fond border border-bordure-legere rounded-2xl p-4 mt-4">
+              <summary className="text-sm font-semibold text-texte-titre cursor-pointer">
+                Les colonnes du jeu de données ({contenu.description.colonnes.filter(c => c.gardee).length} utilisées pour l’analyse sur {contenu.description.colonnes.length})
+              </summary>
+              {contenu.description.description_jeu && <p className="text-sm text-texte-secondaire mt-3">{contenu.description.description_jeu}</p>}
+              <ul className="mt-3 space-y-2">
+                {contenu.description.colonnes.map(c => (
+                  <li key={c.nom} className="text-sm">
+                    <span className={`font-medium ${c.gardee ? 'text-texte' : 'text-texte-discret'}`}>{c.nom}</span>
+                    <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${c.gardee ? 'bg-fond-bleu-clair text-principal' : 'bg-fond-gris text-texte-discret'}`}>
+                      {c.gardee ? 'utilisée' : 'non utilisée'}
+                    </span>
+                    <p className="text-texte-secondaire mt-0.5">{c.description}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </>
       )}
