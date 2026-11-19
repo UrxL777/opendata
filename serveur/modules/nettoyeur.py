@@ -1,3 +1,15 @@
+# ═══ LE NETTOYEUR : Python nettoie, Atlas décide de ce que Python ne peut pas comprendre ═══
+# Démarche (fonction nettoyer, en bas) :
+#   1. nettoyer_textes : espaces en trop, cases vides               (Python seul, sans risque)
+#   2. supprimer_colonnes_vides                                       (Python seul, sans risque)
+#   3. supprimer_doublons_exacts                                      (Python seul, sans risque)
+#   4. convertir_dates : dates écrites de façons différentes          (Python seul)
+#   5. Atlas est consulté une seule fois : rôles faux ? que faire des cases vides ?
+#   6. corriger_roles : Python vérifie puis applique les rôles proposés par Atlas
+#   7. imputer_valeurs_manquantes : Python vérifie (_choix_controle) puis applique les choix d'Atlas
+#   8. detecter_anomalies : les valeurs extrêmes sont signalées, jamais modifiées
+# Chaque étape écrit une phrase dans le journal, qui devient le rapport affiché sur le site.
+# ═════════════════════════════════════════════════════════════════════════════════
 import pandas as pd
 import numpy as np
 from modules.inspecteur import convertir_en_dates, proportion_de_dates, SEUIL_DATES
@@ -102,6 +114,7 @@ def corriger_roles(df: pd.DataFrame, colonnes_inspection: list, decision: dict |
         return df, operations, acceptes
     infos = {c["nom"]: c for c in colonnes_inspection}
 
+    # Chaque rôle proposé par Atlas est contrôlé : refusé s'il contredit le contenu réel de la colonne
     for col, choix in corrections.items():
         if col not in df.columns or not isinstance(choix, dict):
             continue
@@ -143,6 +156,7 @@ def imputer_valeurs_manquantes(df: pd.DataFrame, colonnes_inspection: list, deci
     roles = {c["nom"]: c["role_estime"] for c in colonnes_inspection}
     nb_lignes = len(df)
 
+    # Pour chaque colonne avec des cases vides : choix d'Atlas → contrôle par Python → application → phrase du journal
     for col in df.columns:
         nb_manquants = int(df[col].isna().sum())
         if nb_manquants == 0:
@@ -201,6 +215,7 @@ def detecter_anomalies(df: pd.DataFrame, colonnes_inspection: list) -> list:
         serie = df[col].dropna()
         if len(serie) < 10:
             continue
+        # Méthode IQR : une valeur hors de [Q1 − 1,5 × écart, Q3 + 1,5 × écart] est atypique
         q1 = serie.quantile(0.25)
         q3 = serie.quantile(0.75)
         iqr = q3 - q1
@@ -229,6 +244,7 @@ def nettoyer(df: pd.DataFrame, colonnes_inspection: list, choisir_traitement=Non
     """
     journal = []
 
+    # 1 à 4 : les corrections sûres, faites par Python seul
     df, ops = nettoyer_textes(df)
     journal.extend(ops)
 
@@ -241,7 +257,7 @@ def nettoyer(df: pd.DataFrame, colonnes_inspection: list, choisir_traitement=Non
     df, ops = convertir_dates(df, colonnes_inspection)
     journal.extend(ops)
 
-    # Atlas : un seul appel, deux missions (vérifier les rôles, choisir le traitement des cases vides)
+    # 5. Atlas : un seul appel, deux missions (vérifier les rôles, choisir le traitement des cases vides)
     decision = None
     if choisir_traitement is not None:
         try:
@@ -249,15 +265,19 @@ def nettoyer(df: pd.DataFrame, colonnes_inspection: list, choisir_traitement=Non
         except Exception as e:
             print(f"[NETTOYAGE] Atlas n'a pas pu être consulté : {str(e)[:200]}")
 
+    # 6. Python vérifie et applique les rôles corrigés par Atlas
     colonnes_inspection = [dict(c) for c in colonnes_inspection]  # copie : l'inspection d'origine reste intacte
     df, ops, roles_atlas = corriger_roles(df, colonnes_inspection, decision)
     journal.extend(ops)
 
+    # 7. Python vérifie et applique les choix d'Atlas pour les cases vides
     df, ops = imputer_valeurs_manquantes(df, colonnes_inspection, decision)
     journal.extend(ops)
 
+    # 8. Signaler les valeurs extrêmes (sans les modifier)
     anomalies = detecter_anomalies(df, colonnes_inspection)
 
+    # Le résultat : le tableau propre, le journal des opérations, les anomalies et les rôles d'Atlas
     return {
         "df_nettoye": df,
         "journal": journal,

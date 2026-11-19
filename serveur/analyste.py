@@ -45,6 +45,7 @@ def _simple(v):
 
 def profiler(df: pd.DataFrame) -> dict:
     """Résumé de chaque colonne, calculé sur tout le fichier. Python ne décide que des faits sûrs."""
+    # Pour chaque colonne : type, cases vides, valeurs différentes, min, max, moyenne, valeurs fréquentes
     n = len(df)
     textes = [c for c in df.columns if df[c].dtype == object]
     colonnes = []
@@ -76,6 +77,7 @@ def profiler(df: pd.DataFrame) -> dict:
                     info["avis_python"] = f"semble être un code qui répète la colonne {autre} ; à toi de juger"
                     break
         colonnes.append(info)
+    # 5 lignes d'exemple tirées au hasard dans tout le fichier
     exemples = df.sample(min(5, n), random_state=42).to_dict(orient="records") if n else []
     exemples = [{k: _simple(v) for k, v in ligne.items()} for ligne in exemples]
     return {"nb_lignes": n, "nb_colonnes": df.shape[1], "colonnes": colonnes, "lignes_exemple": exemples}
@@ -110,10 +112,13 @@ Réponds uniquement en JSON : {"description_jeu": "...", "colonnes": [{"nom": ".
 
 def decrire_colonnes(profil: dict, titre: str, description: str) -> dict:
     """Atlas décrit chaque colonne ; le code a le dernier mot sur les faits sûrs et complète les oublis."""
+    # 1. Atlas reçoit le titre, la description et le profil (pas les données elles-mêmes)
     entree = json.dumps({"titre": titre, "description_publiee": description, **_profil_compact(profil)},
                         ensure_ascii=False, default=str)
     desc = _appeler_analyste([{"role": "system", "content": PROMPT_DESCRIPTION},
                               {"role": "user", "content": entree}], "description des colonnes")
+    # 2. Python vérifie : une colonne avec un fait sûr (vide, identique partout, trop de vides) n'est jamais gardée,
+    #    et une colonne oubliée par Atlas reçoit quand même une phrase
     faits = {c["nom"]: c.get("fait_python") for c in profil["colonnes"]}
     proposees = {str(c.get("nom")): c for c in (desc.get("colonnes") or []) if isinstance(c, dict)}
     colonnes = []
@@ -184,6 +189,7 @@ def _probleme_resultat(res: dict, type_graphique: str) -> str | None:
 def executer_graphique(chemin: str, graphique: dict, colonnes_utiles: list) -> dict | None:
     """Exécute la requête d'Atlas ; en cas d'erreur, Atlas la corrige (MAX_ESSAIS au total)."""
     sql, type_graphique = str(graphique.get("sql") or ""), graphique.get("type")
+    # Boucle : exécuter → vérifier le résultat → si problème, Atlas corrige la requête → réessayer
     for essai in range(MAX_ESSAIS):
         res = executer_requete(chemin, sql)
         probleme = _probleme_resultat(res, type_graphique)
@@ -363,15 +369,18 @@ def _reperes(graphique: dict) -> dict:
 
 def ecrire_message(question: str, graphiques: list, unite: str | None, reference: str, filtres: list) -> dict:
     """Atlas écrit le texte ; Python refuse les chiffres inventés et les causes (2 réécritures), puis nettoie."""
+    # 1. Atlas reçoit la question, les résultats exacts et les repères (le plus haut, le plus bas…)
     entree = json.dumps({"question_phare": question, "unite_mesure": unite, "filtres": [f["colonne"] for f in filtres],
                          "graphiques": [{"id": g["id"], "titre": g["titre"], "colonnes": g["resultat"]["colonnes"],
                                          "lignes": g["resultat"]["lignes"], **_reperes(g)} for g in graphiques]},
                         ensure_ascii=False, default=str)
+    # 2. Les seuls nombres qu'Atlas a le droit d'écrire : ceux des résultats
     autorises = nombres_autorises([g["resultat"]["lignes"] for g in graphiques])
     messages = [{"role": "system", "content": PROMPT_MESSAGE}, {"role": "user", "content": entree}]
     brut = _appeler_analyste(messages, "texte")
     noms_filtres = brut.get("noms_filtres") if isinstance(brut.get("noms_filtres"), dict) else {}
     msg = _normaliser(brut)
+    # 3. Contrôle : un nombre inventé ou un mot de cause → Atlas réécrit (2 fois au maximum)
     for essai in range(2):
         faux = _inconnus(_textes(msg), autorises)
         causes = sorted({m.group(0).lower() for m in re.finditer(MOTS_DE_CAUSE, _textes(msg), re.I)})
@@ -383,6 +392,7 @@ def ecrire_message(question: str, graphiques: list, unite: str | None, reference
             "Réécris sans eux : uniquement les chiffres des résultats, et décris sans expliquer les causes."}],
             f"texte corrigé {essai + 1}"))
 
+    # 4. Nettoyage final de chaque texte : phrases fautives retirées, zéros inutiles, devises inventées
     def net(t):
         return retirer_devises_inventees(_sans_zeros_inutiles(_filtrer(t, autorises)), reference)
     msg["reponse"] = net(msg["reponse"])
@@ -409,6 +419,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
     """
     titre, description = fiche.get("titre") or "", fiche.get("description") or ""
     print(f"\n[ANALYSTE] ── Début de l'analyse : {titre or '(sans titre)'}")
+    # 0. Python lit le jeu propre en entier et résume chaque colonne (profil)
     df = pd.read_parquet(chemin_propre) if chemin_propre.endswith(".parquet") else pd.read_csv(chemin_propre)
     profil = profiler(df)
     reference = " ".join([titre, description] + [str(c) for c in df.columns])
@@ -502,6 +513,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
                         "unite": desc["unite_mesure"] or "", "valeur": r["lignes"][0][0], "sql": sql,
                         "colonne": mesure, "sans_base": True})
 
+    # 6. Les pistes pour le data analyst (sans chiffre, sans cause), puis le dashboard complet à enregistrer
     pistes = [p for p in (plan.get("pistes") or []) if isinstance(p, str) and p.strip() and not nombres_du_texte(p)][:2]
     pistes = [p for p in sans_cause(pistes) if not re.search(MOTS_DE_CAUSE, p, re.I)]
     dashboard = {

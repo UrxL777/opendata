@@ -1,3 +1,5 @@
+# ═══ LE RAPPORT : résume le nettoyage pour le site (lignes avant / après, liste des opérations) ═══
+# Il est enregistré dans la table analyses (main.py, étape 9) et affiché sur la page du jeu de données.
 # ─── Génération du rapport de nettoyage ────────────────────────────────────────
 
 def generer_rapport(inspection: dict, nettoyage: dict) -> dict:

@@ -2,86 +2,154 @@
 
 /*
   ─── LES COULEURS DU SITE ─────────────────────────────────────────────────────
-  Toutes les couleurs sont déclarées ICI, une seule fois, avec un nom qui dit à quoi elles servent.
-  Pour changer une couleur sur tout le site, on change seulement sa valeur ici.
+  Ce fichier a deux parties :
 
-  Chaque commentaire donne : le nom de la couleur en français · son code (#...) : où elle est utilisée.
-  Pour changer une couleur, on peut remplacer sa valeur par un simple code, par exemple #16a34a (un vert).
+  1. LA PALETTE : chaque couleur y reçoit un nom en français (--vert, --bleu-vif, --rouge…).
+     Le code bizarre (#16a34a) est écrit une seule fois, ici. On n'a pas besoin d'y toucher.
 
-  Comment s'en servir dans le code : le nom après "--color-" devient une classe Tailwind.
-    --color-principal       →  bg-principal (fond)   text-principal (texte)   border-principal (bordure)
-    --color-texte-doux      →  text-texte-doux
+  2. LES USAGES : chaque partie du site dit quelle couleur de la palette elle prend.
+
+  ➜ POUR CHANGER UNE COULEUR, on remplace seulement le nom entre var( ).
+     Exemple : pour des boutons verts au lieu de bleus, on écrit
+        --color-principal: var(--vert);
+     au lieu de
+        --color-principal: var(--bleu-vif);
+     Puis on enregistre : le site change partout où cette couleur est utilisée.
+
+  Dans le code des pages, le nom après "--color-" devient une classe Tailwind :
+    --color-principal   →  bg-principal (fond)   text-principal (texte)   border-principal (bordure)
 */
+
+/* ─── 1. LA PALETTE : les couleurs disponibles, avec leur nom ──────────────── */
+:root {
+  /* Blancs et noirs */
+  --blanc: #ffffff;
+  --blanc-casse: #f9fafb;
+  --noir: #000000;
+  --noir-bleute: #111827;
+
+  /* Gris (du plus clair au plus foncé) */
+  --gris-tres-clair: #f3f4f6;
+  --gris-perle: #e5e7eb;
+  --gris-clair: #d1d5db;
+  --gris-moyen: #9ca3af;
+  --gris: #6b7280;
+  --gris-ardoise: #4b5563;
+  --gris-fonce: #374151;
+  --gris-anthracite: #1f2937;
+
+  /* Bleus (du plus clair au plus foncé) */
+  --bleu-tres-pale: #eff6ff;
+  --bleu-pale: #dbeafe;
+  --bleu-glacier: #bfdbfe;
+  --bleu-clair: #93c5fd;
+  --bleu-ciel: #60a5fa;
+  --bleu: #3b82f6;
+  --bleu-vif: #2563eb;        /* le bleu d'OpenData */
+  --bleu-fonce: #1d4ed8;
+  --bleu-profond: #1e40af;
+  --bleu-nuit: #1e3a8a;
+  --cyan: #0891b2;
+
+  /* Verts */
+  --vert-pale: #dcfce7;
+  --vert-clair: #86efac;
+  --vert: #16a34a;
+  --vert-fonce: #15803d;
+  --vert-d-eau: #0d9488;
+
+  /* Rouges et roses */
+  --rose-tres-pale: #fef2f2;
+  --rose-pale: #fee2e2;
+  --rose-clair: #fecaca;
+  --saumon: #fca5a5;
+  --rouge-vif: #ef4444;
+  --rouge: #dc2626;
+  --rouge-fonce: #b91c1c;
+  --bordeaux: #991b1b;
+  --rose-framboise: #db2777;
+
+  /* Jaunes, oranges, violets, marrons */
+  --jaune: #eab308;
+  --ambre: #d97706;
+  --orange: #ea580c;
+  --violet-pale: #ede9fe;
+  --violet: #7c3aed;
+  --violet-fonce: #6d28d9;
+  --marron: #92400e;
+}
+
+/* ─── 2. LES USAGES : quelle couleur pour quelle partie du site ─────────────── */
 @theme static {
   /* Zones précises */
-  --color-navbar: #ffffff;                           /* blanc · #ffffff : fond de la barre de navigation */
-  --color-bouton-publier: oklch(54.6% 0.245 262.881); /* bleu vif · #2563eb : bouton « Publier sur OpenData » */
-  --color-bouton-publier-survol: oklch(48.8% 0.243 264.376); /* bleu foncé · #1d4ed8 : le même bouton au survol de la souris */
-  --color-pied-de-page: oklch(21% 0.034 264.665);    /* noir bleuté · #111827 : fond du pied de page */
-  --color-texte-pied-de-page: oklch(87.2% 0.01 258.338); /* gris clair · #d1d5db : textes du pied de page */
-  --color-bordure-pied-de-page: oklch(27.8% 0.033 256.848); /* gris anthracite · #1f2937 : ligne de séparation du pied de page */
+  --color-navbar: var(--blanc);                         /* fond de la barre de navigation */
+  --color-bouton-publier: var(--bleu-vif);              /* bouton « Publier sur OpenData » */
+  --color-bouton-publier-survol: var(--bleu-fonce);     /* le même bouton au survol de la souris */
+  --color-pied-de-page: var(--noir-bleute);             /* fond du pied de page */
+  --color-texte-pied-de-page: var(--gris-clair);        /* textes du pied de page */
+  --color-bordure-pied-de-page: var(--gris-anthracite); /* ligne de séparation du pied de page */
 
   /* Couleur principale (le bleu d'OpenData) : boutons, liens, icônes */
-  --color-principal: oklch(54.6% 0.245 262.881);     /* bleu vif · #2563eb */
-  --color-principal-survol: oklch(48.8% 0.243 264.376); /* bleu foncé · #1d4ed8 : boutons au survol */
-  --color-bleu-nuit: oklch(37.9% 0.146 265.522);     /* bleu nuit · #1e3a8a : pastille d'icône foncée */
-  --color-accent-doux: oklch(70.7% 0.165 254.624);   /* bleu ciel · #60a5fa : petits points animés, poignée au survol */
+  --color-principal: var(--bleu-vif);
+  --color-principal-survol: var(--bleu-fonce);          /* boutons au survol */
+  --color-bleu-nuit: var(--bleu-nuit);                  /* pastille d'icône foncée */
+  --color-accent-doux: var(--bleu-ciel);                /* petits points animés, poignée au survol */
 
   /* Fonds */
-  --color-fond: #ffffff;                             /* blanc · #ffffff : cartes, fenêtres, panneaux */
-  --color-fond-doux: oklch(98.5% 0.002 247.839);     /* blanc cassé · #f9fafb : fond de page, zones légèrement grisées */
-  --color-fond-gris: oklch(96.7% 0.003 264.542);     /* gris très clair · #f3f4f6 : étiquettes, boutons secondaires au survol */
-  --color-fond-gris-moyen: oklch(92.8% 0.006 264.531); /* gris perle · #e5e7eb : boutons désactivés, séparateurs épais */
-  --color-poignee: oklch(87.2% 0.01 258.338);        /* gris clair · #d1d5db : petite barre pour tirer un panneau (mobile) */
-  --color-indicateur-saisie: oklch(70.7% 0.022 261.325); /* gris moyen · #9ca3af : points « Atlas écrit… » */
-  --color-fond-bleu-clair: oklch(97% 0.014 254.604); /* bleu très pâle · #eff6ff : encadrés bleus (rapport de nettoyage…) */
-  --color-fond-bleu-pale: oklch(93.2% 0.032 255.585); /* bleu pâle · #dbeafe : survol des zones bleu clair */
-  --color-fond-erreur: oklch(97.1% 0.013 17.38);     /* rose très pâle · #fef2f2 : encadré d'erreur */
-  --color-fond-erreur-survol: oklch(93.6% 0.032 17.717); /* rose pâle · #fee2e2 */
-  --color-voile: #000000;                            /* noir · #000000 : voile sombre derrière une fenêtre (avec transparence) */
-  --color-degrade-debut: oklch(97% 0.014 254.604);   /* bleu très pâle · #eff6ff : dégradé de l'accueil */
-  --color-degrade-fin: #ffffff;                      /* blanc · #ffffff */
+  --color-fond: var(--blanc);                           /* cartes, fenêtres, panneaux */
+  --color-fond-doux: var(--blanc-casse);                /* fond de page, zones légèrement grisées */
+  --color-fond-gris: var(--gris-tres-clair);            /* étiquettes, boutons secondaires au survol */
+  --color-fond-gris-moyen: var(--gris-perle);           /* boutons désactivés, séparateurs épais */
+  --color-poignee: var(--gris-clair);                   /* petite barre pour tirer un panneau (mobile) */
+  --color-indicateur-saisie: var(--gris-moyen);         /* points « Atlas écrit… » */
+  --color-fond-bleu-clair: var(--bleu-tres-pale);       /* encadrés bleus (rapport de nettoyage…) */
+  --color-fond-bleu-pale: var(--bleu-pale);             /* survol des zones bleu clair */
+  --color-fond-erreur: var(--rose-tres-pale);           /* encadré d'erreur */
+  --color-fond-erreur-survol: var(--rose-pale);         /* encadré d'erreur au survol */
+  --color-voile: var(--noir);                           /* voile sombre derrière une fenêtre (avec transparence) */
+  --color-degrade-debut: var(--bleu-tres-pale);         /* dégradé de l'accueil : couleur du haut */
+  --color-degrade-fin: var(--blanc);                    /* dégradé de l'accueil : couleur du bas */
 
   /* Textes */
-  --color-texte-titre: oklch(21% 0.034 264.665);     /* noir bleuté · #111827 : grands titres */
-  --color-texte: oklch(27.8% 0.033 256.848);         /* gris anthracite · #1f2937 : texte normal */
-  --color-texte-moyen: oklch(37.3% 0.034 259.733);   /* gris foncé · #374151 */
-  --color-texte-secondaire: oklch(44.6% 0.03 256.802); /* gris ardoise · #4b5563 */
-  --color-texte-doux: oklch(55.1% 0.027 264.364);    /* gris · #6b7280 : textes d'explication */
-  --color-texte-discret: oklch(70.7% 0.022 261.325); /* gris moyen · #9ca3af : petites indications, dates */
-  --color-texte-inverse: #ffffff;                    /* blanc · #ffffff : texte sur un fond bleu ou sombre */
-  --color-texte-puce: oklch(80.9% 0.105 251.813);    /* bleu clair · #93c5fd : puces des listes bleues */
-  --color-texte-bleu-doux: oklch(70.7% 0.165 254.624); /* bleu ciel · #60a5fa */
-  --color-texte-bleu-vif: oklch(62.3% 0.214 259.815); /* bleu · #3b82f6 */
-  --color-texte-principal-fonce: oklch(48.8% 0.243 264.376); /* bleu foncé · #1d4ed8 */
-  --color-texte-bleu-fonce: oklch(42.4% 0.199 265.638); /* bleu profond · #1e40af */
-  --color-texte-bleu-nuit: oklch(37.9% 0.146 265.522); /* bleu nuit · #1e3a8a */
-  --color-texte-erreur-vif: oklch(63.7% 0.237 25.331); /* rouge vif · #ef4444 */
-  --color-texte-erreur: oklch(57.7% 0.245 27.325);   /* rouge · #dc2626 */
-  --color-texte-erreur-fonce: oklch(50.5% 0.213 27.518); /* rouge foncé · #b91c1c */
-  --color-texte-erreur-tres-fonce: oklch(44.4% 0.177 26.899); /* bordeaux · #991b1b */
+  --color-texte-titre: var(--noir-bleute);              /* grands titres */
+  --color-texte: var(--gris-anthracite);                /* texte normal */
+  --color-texte-moyen: var(--gris-fonce);
+  --color-texte-secondaire: var(--gris-ardoise);
+  --color-texte-doux: var(--gris);                      /* textes d'explication */
+  --color-texte-discret: var(--gris-moyen);             /* petites indications, dates */
+  --color-texte-inverse: var(--blanc);                  /* texte sur un fond bleu ou sombre */
+  --color-texte-puce: var(--bleu-clair);                /* puces des listes bleues */
+  --color-texte-bleu-doux: var(--bleu-ciel);
+  --color-texte-bleu-vif: var(--bleu);
+  --color-texte-principal-fonce: var(--bleu-fonce);
+  --color-texte-bleu-fonce: var(--bleu-profond);
+  --color-texte-bleu-nuit: var(--bleu-nuit);
+  --color-texte-erreur-vif: var(--rouge-vif);
+  --color-texte-erreur: var(--rouge);
+  --color-texte-erreur-fonce: var(--rouge-fonce);
+  --color-texte-erreur-tres-fonce: var(--bordeaux);
 
   /* Bordures */
-  --color-bordure-legere: oklch(96.7% 0.003 264.542); /* gris très clair · #f3f4f6 : séparations très discrètes */
-  --color-bordure: oklch(92.8% 0.006 264.531);       /* gris perle · #e5e7eb : bordure des cartes */
-  --color-bordure-champ: oklch(87.2% 0.01 258.338);  /* gris clair · #d1d5db : bordure des champs de formulaire */
-  --color-bordure-focus: oklch(62.3% 0.214 259.815); /* bleu · #3b82f6 : champ sélectionné */
-  --color-bordure-bleu-pale: oklch(93.2% 0.032 255.585); /* bleu pâle · #dbeafe */
-  --color-bordure-bleu-clair: oklch(88.2% 0.059 254.128); /* bleu glacier · #bfdbfe */
-  --color-bordure-bleu: oklch(80.9% 0.105 251.813);  /* bleu clair · #93c5fd */
-  --color-bordure-bleu-doux: oklch(70.7% 0.165 254.624); /* bleu ciel · #60a5fa */
-  --color-bordure-erreur: oklch(88.5% 0.062 18.334); /* rose clair · #fecaca */
-  --color-bordure-erreur-forte: oklch(80.8% 0.114 19.571); /* saumon · #fca5a5 */
+  --color-bordure-legere: var(--gris-tres-clair);       /* séparations très discrètes */
+  --color-bordure: var(--gris-perle);                   /* bordure des cartes */
+  --color-bordure-champ: var(--gris-clair);             /* bordure des champs de formulaire */
+  --color-bordure-focus: var(--bleu);                   /* champ sélectionné */
+  --color-bordure-bleu-pale: var(--bleu-pale);
+  --color-bordure-bleu-clair: var(--bleu-glacier);
+  --color-bordure-bleu: var(--bleu-clair);
+  --color-bordure-bleu-doux: var(--bleu-ciel);
+  --color-bordure-erreur: var(--rose-clair);
+  --color-bordure-erreur-forte: var(--saumon);
 
   /* Graphiques des dashboards : le bleu d'OpenData en premier, puis des couleurs qui s'accordent avec lui.
      Palette vérifiée : couleurs bien distinctes (aussi pour les daltoniens) et lisibles sur fond blanc. */
-  --color-graphique-1: oklch(54.6% 0.245 262.881);   /* bleu vif · #2563eb : bleu OpenData */
-  --color-graphique-2: #0d9488;                      /* vert d'eau · #0d9488 : vert d'eau */
-  --color-graphique-3: #7c3aed;                      /* violet · #7c3aed : violet */
-  --color-graphique-4: #d97706;                      /* ambre · #d97706 : ambre */
-  --color-graphique-5: #db2777;                      /* rose framboise · #db2777 : rose */
-  --color-graphique-6: #0891b2;                      /* cyan · #0891b2 : cyan */
-  --color-graphique-grille: oklch(96.7% 0.003 264.542); /* gris très clair · #f3f4f6 : lignes de fond des graphiques */
+  --color-graphique-1: var(--bleu-vif);
+  --color-graphique-2: var(--vert-d-eau);
+  --color-graphique-3: var(--violet);
+  --color-graphique-4: var(--ambre);
+  --color-graphique-5: var(--rose-framboise);
+  --color-graphique-6: var(--cyan);
+  --color-graphique-grille: var(--gris-tres-clair);     /* lignes de fond des graphiques */
 }
 
 /* Graphiques : pas de cadre noir autour d'une barre après un clic */
