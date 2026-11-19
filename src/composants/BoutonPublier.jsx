@@ -110,7 +110,7 @@ function FormulaireDataset({ onFermer }) {
     const suggestions = (async () => {
       const form = new FormData()
       form.append('fichier', f)
-      const rep = await fetch(`${import.meta.env.VITE_API_URL}/suggerer`, { method: 'POST', body: form, signal: controleur.signal })
+      const rep = await fetch(`${import.meta.env.VITE_API_URL}/suggerer`, { method: 'POST', body: form, signal: controleur.signal })  // Envoi du fichier vers le serveur
       if (!rep.ok) return
       const s = await rep.json()
       suggestionRef.current = { titre: s.titre || '', description: s.description || '', categorieId: s.categorie_id ? String(s.categorie_id) : '' }

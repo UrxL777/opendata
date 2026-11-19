@@ -561,7 +561,7 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
 
     return meilleur_jeu, meilleur_pct, False
 
-
+# Reception du fichier et suggestion de la catégorie
 @app.post("/suggerer")
 async def suggerer(fichier: UploadFile = File(...)):
     print(f"\n[SUGGERER] ── Fichier reçu : {fichier.filename}")
@@ -569,7 +569,7 @@ async def suggerer(fichier: UploadFile = File(...)):
     suffixe = os.path.splitext(fichier.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffixe) as tmp:
         shutil.copyfileobj(fichier.file, tmp)
-        chemin_tmp = tmp.name
+        chemin_tmp = tmp.name     # Adresse du ficher 
 
     try:
         suggestion = agent_suggerer(chemin_tmp, fichier.filename)
