@@ -384,7 +384,7 @@ async def analyser(
                 print(f"[ANALYSER] Doublon détecté : jeu_id existant = {fichier_id_existant}")
 
         # Étape 4 : inspecteur.py examine le fichier (colonnes, rôles, cases vides, doublons) → inspection
-        print(f"[ANALYSER] Lancement de l'inspection...")
+        print("[ANALYSER] Lancement de l'inspection...")
         inspection = inspecter(chemin_tmp, fichier.filename)  # INSPECTION (inspecteur.py)
         print(f"[ANALYSER] Inspection terminée : lisible={inspection.get('lisible')} | erreur={inspection.get('erreur')}")
 
@@ -437,7 +437,7 @@ async def analyser(
                 .update({"hash_fichier": hash_fichier}) \
                 .eq("id", id_a_sauvegarder) \
                 .execute()
-            print(f"[ANALYSER] ✓ Sauvegarde réussie")
+            print("[ANALYSER] ✓ Sauvegarde réussie")
 
             # Étape 10 : préparer le dashboard (Parquet + file d'attente) ; il sera créé en arrière-plan
             # Dashboard automatique : jamais bloquant pour le rapport, qui est déjà enregistré
@@ -446,10 +446,10 @@ async def analyser(
             except Exception:
                 print(f"[DASHBOARD] ✗ Préparation impossible : {traceback.format_exc()}")
         else:
-            print(f"[ANALYSER] Aucun id_a_sauvegarder — analyse non persistée")
+            print("[ANALYSER] Aucun id_a_sauvegarder — analyse non persistée")
 
         # Étape 11 : répondre au site avec le rapport
-        print(f"[ANALYSER] ✓ Terminé avec succès\n")
+        print("[ANALYSER] ✓ Terminé avec succès\n")
         return _nettoyer_nan({
             **resultats,
             "hash_fichier": hash_fichier,
@@ -595,7 +595,7 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
     }
 
     # On compare avec chaque jeu qui a les mêmes colonnes, et on garde celui qui a le plus de lignes en commun
-    meilleur_jeu, meilleur_pct, identique = None, None, False
+    meilleur_jeu, meilleur_pct = None, None
     for jeu in jeux:
         colonnes = colonnes_par_jeu.get(str(jeu["id"]))
         fichiers = jeu.get("fichiers") or []
