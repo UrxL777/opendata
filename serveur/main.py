@@ -1,4 +1,22 @@
 # Point d'entrée FastAPI — pipeline d'analyse des jeux de données
+# ═══ LE CHEF D'ORCHESTRE DU SERVEUR ══════════════════════════════════════════════
+# Ce fichier reçoit les demandes du site (les « routes ») et appelle les autres fichiers dans l'ordre.
+# LA DÉMARCHE QUAND QUELQU'UN PUBLIE UN FICHIER :
+#   0. Avant la publication : /suggerer (Atlas propose titre, description, catégorie)
+#                             /verifier-doublon (déjà publié ? nouvelle version ?)
+#   1. /analyser reçoit le fichier et le copie dans un fichier temporaire (chemin_tmp)
+#   2. Python calcule son empreinte (hash MD5) pour reconnaître un doublon
+#   3. modules/inspecteur.py examine le fichier (colonnes, rôles, cases vides, doublons)
+#   4. modules/nettoyeur.py le nettoie ; Atlas décide des cases vides, Python vérifie
+#   5. modules/rapport.py résume le nettoyage ; le rapport va dans la table analyses
+#   6. le jeu propre est rangé (format Parquet) et mis dans la file d'attente
+#   7. un fil de travail séparé appelle analyste.py : Atlas crée le dashboard (table dashboards)
+# ENSUITE : /dashboard/filtrer recalcule avec DuckDB (sans IA) ; /chat fait répondre Atlas.
+# Qui fait quoi :
+#   modules/*.py : Python seul (inspecter, nettoyer, comparer, exécuter le SQL)
+#   agent.py     : Atlas (suggestions, cases vides, chat)
+#   analyste.py  : Atlas dans son rôle de data analyst (le dashboard)
+# ═════════════════════════════════════════════════════════════════════════════════
 import os, tempfile, shutil, traceback, hashlib, math, asyncio, queue, threading
 from datetime import datetime, timezone
 import pandas as pd
@@ -19,6 +37,7 @@ from agent import suggerer as agent_suggerer, chat as agent_chat, mettre_en_form
     choisir_traitement_manquants, base_du_kpi
 from analyste import analyser_dataset
 
+# Connexion à Supabase : les clés sont lues dans les variables d'environnement (.env), jamais écrites dans le code
 load_dotenv()
 
 supabase = create_client(
@@ -36,6 +55,8 @@ supabase = create_client(
 
 DOSSIER_PROPRES = os.path.join(tempfile.gettempdir(), "opendata_propres")  # copies locales (cache)
 os.makedirs(DOSSIER_PROPRES, exist_ok=True)
+# _file_dashboards : la file d'attente (les numéros des jeux qui attendent leur dashboard)
+# _dans_la_file : pour ne jamais mettre deux fois le même jeu ; _verrou_file : empêche deux fils de la modifier en même temps
 _file_dashboards: "queue.Queue[str]" = queue.Queue()
 _dans_la_file: set[str] = set()
 _verrou_file = threading.Lock()
@@ -110,13 +131,16 @@ def mettre_en_file(jeu_id: str) -> None:
 def preparer_dashboard(jeu_id: str, df_propre: pd.DataFrame, hash_fichier: str | None) -> None:
     """Appelée par /analyser après le rapport : range le jeu propre, puis réutilise ou met en file."""
     jeu_id = str(jeu_id)
+    # 1. Ranger le jeu propre (Parquet) dans le stockage Supabase
     chemin = enregistrer_fichier_propre(df_propre, jeu_id)
+    # 2. Un jeu au contenu identique a déjà un dashboard ? On le réutilise, sans appeler l'IA
     existant = _dashboard_meme_contenu(jeu_id, hash_fichier)
     if existant:
         _maj_dashboard(jeu_id, statut="termine", fiche=existant["fiche"], contenu=existant["contenu"],
                        chemin_propre=chemin, erreur=None)
         print(f"[DASHBOARD] Jeu {jeu_id} : même contenu qu'un jeu existant, dashboard réutilisé (0 token)")
         return
+    # 3. Sinon : statut « en attente », puis mise dans la file
     _maj_dashboard(jeu_id, statut="en_attente", chemin_propre=chemin, erreur=None)
     mettre_en_file(jeu_id)
     print(f"[DASHBOARD] Jeu {jeu_id} mis en file d'attente ({_file_dashboards.qsize()} en attente)")
@@ -124,7 +148,9 @@ def preparer_dashboard(jeu_id: str, df_propre: pd.DataFrame, hash_fichier: str |
 
 def _creer_dashboard(jeu_id: str) -> None:
     """Le vrai travail : fiche d'identité, puis Atlas (rôle d'analyste), puis enregistrement."""
+    # 1. Le statut passe à « en cours » (le site affiche « en préparation »)
     _maj_dashboard(jeu_id, statut="en_cours")
+    # 2. Retrouver le fichier propre, le titre et la description du jeu
     ligne = supabase.table("dashboards").select("chemin_propre").eq("jeu_de_donnees_id", jeu_id).maybe_single().execute()
     jeu = supabase.table("jeux_de_donnees").select("titre, description").eq("id", jeu_id).maybe_single().execute()
     if not ligne or not ligne.data or not ligne.data.get("chemin_propre"):
@@ -138,8 +164,10 @@ def _creer_dashboard(jeu_id: str) -> None:
         roles_atlas = ((((analyse.data if analyse else None) or {}).get("resultats") or {}).get("rapport") or {}).get("roles_atlas") or {}
     except Exception:
         pass
+    # 3. Python écrit la fiche d'identité, puis analyste.py (Atlas) construit le dashboard
     fiche = fiche_identite(pd.read_parquet(chemin_local), infos.get("titre") or "", infos.get("description") or "", roles_atlas)
     dashboard = analyser_dataset(fiche, chemin_local)
+    # 4. Enregistrer le dashboard dans la table dashboards : le site n'aura plus qu'à le lire
     _maj_dashboard(jeu_id, statut="termine", fiche=_nettoyer_nan(fiche), contenu=_nettoyer_nan(dashboard), erreur=None)
     print(f"[DASHBOARD] ✓ Jeu {jeu_id} : dashboard enregistré")
 
@@ -147,6 +175,7 @@ def _creer_dashboard(jeu_id: str) -> None:
 def _travailleur_dashboards() -> None:
     """Fil de travail séparé : prend les jeux dans la file, un par un, pour toujours."""
     while True:
+        # Attend qu'un jeu arrive dans la file, puis crée son dashboard ; une erreur est notée sans arrêter le fil
         jeu_id = _file_dashboards.get()
         try:
             _creer_dashboard(jeu_id)
@@ -197,6 +226,7 @@ async def _tache_reanalyse():
             res_analyses = supabase.table("analyses").select("fichier_id").eq("statut", "termine").execute()
             ids_termines = {row["fichier_id"] for row in (res_analyses.data or [])}
 
+            # Les jeux sans rapport terminé sont renvoyés à /analyser, un par un
             a_reanalyser = [j for j in tous_jeux if j["id"] not in ids_termines and j.get("fichiers")]
             print(f"[REANALYSE] {len(a_reanalyser)} jeu(x) à traiter")
 
@@ -239,12 +269,14 @@ async def _tache_reanalyse():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Au démarrage du serveur : on lance la relance automatique (toutes les 5 min) et le fil des dashboards
     tache = asyncio.create_task(_tache_reanalyse())
     threading.Thread(target=_travailleur_dashboards, daemon=True).start()
     yield
     tache.cancel()  # arrêt propre de la relance automatique quand le serveur s'arrête
 
 
+# L'application FastAPI ; CORS autorise le site (sur Vercel) à appeler ce serveur
 app = FastAPI(title="OpenData API", lifespan=lifespan)
 
 app.add_middleware(
@@ -256,6 +288,7 @@ app.add_middleware(
 )
 
 
+# Formes des données reçues du site (Pydantic vérifie qu'elles sont correctes)
 class RequeteChat(BaseModel):
     jeu_id: str
     messages: list[dict]
@@ -277,6 +310,7 @@ def _nettoyer_nan(obj):
     return obj
 
 
+# ─── Outils : l'empreinte d'un fichier, pour reconnaître les doublons ───
 def calculer_hash(chemin: str, extension: str = "") -> str:
     """Calcule le hash MD5 du contenu + format du fichier."""
     h = hashlib.md5()
@@ -307,6 +341,7 @@ def hash_contenu_dataframe(chemin: str, extension: str) -> str | None:
             return None
         if df is None:
             return None
+        # Colonnes triées et tout en texte : le même contenu donne la même empreinte, en CSV, Excel ou JSON
         df = df.reindex(sorted(df.columns), axis=1)
         contenu_csv = df.fillna('').astype(str).to_csv(index=False)
         return hashlib.md5(contenu_csv.encode("utf-8", errors="replace")).hexdigest()
@@ -314,6 +349,8 @@ def hash_contenu_dataframe(chemin: str, extension: str) -> str | None:
         return None
 
 
+# ─── ROUTE /analyser : le parcours complet d'un fichier publié (étapes 1 à 11 ci-dessous) ───
+# Appelée par le site juste après la publication (BoutonPublier.jsx), et par la relance automatique.
 @app.post("/analyser")
 async def analyser(
     fichier: UploadFile = File(...),
@@ -321,6 +358,7 @@ async def analyser(
     utilisateur_id: str = Query(None),
 ):
     print(f"\n[ANALYSER] ── Fichier reçu : {fichier.filename} | fichier_id={fichier_id}")
+    # Étape 1 : copier le fichier reçu dans un fichier temporaire (chemin_tmp), pour que pandas puisse le lire
 
     suffixe = os.path.splitext(fichier.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffixe) as tmp:
@@ -328,10 +366,12 @@ async def analyser(
         chemin_tmp = tmp.name
 
     try:
+        # Étape 2 : l'empreinte (hash MD5) du contenu : deux fichiers au même contenu ont la même, même dans un autre format
         extension = suffixe.lower().strip(".")
         hash_fichier = hash_contenu_dataframe(chemin_tmp, extension) or calculer_hash(chemin_tmp, extension)
         fichier_id_existant = None
         print(f"[ANALYSER] Hash calculé : {hash_fichier}")
+        # Étape 3 : cet utilisateur a-t-il déjà publié ce contenu ? Alors on met à jour son jeu au lieu d'en créer un
 
         if utilisateur_id:
             res = supabase.table("jeux_de_donnees") \
@@ -343,6 +383,7 @@ async def analyser(
                 fichier_id_existant = str(res.data[0]["id"])
                 print(f"[ANALYSER] Doublon détecté : jeu_id existant = {fichier_id_existant}")
 
+        # Étape 4 : inspecteur.py examine le fichier (colonnes, rôles, cases vides, doublons) → inspection
         print(f"[ANALYSER] Lancement de l'inspection...")
         inspection = inspecter(chemin_tmp, fichier.filename)
         print(f"[ANALYSER] Inspection terminée : lisible={inspection.get('lisible')} | erreur={inspection.get('erreur')}")
@@ -352,9 +393,11 @@ async def analyser(
 
         print(f"[ANALYSER] Dimensions : {inspection.get('nb_lignes')} lignes × {inspection.get('nb_colonnes')} colonnes")
 
+        # Étape 5 : lire le fichier dans un tableau pandas (df), qui va être nettoyé
         df = lire_fichier(chemin_tmp, fichier.filename)
         print(f"[ANALYSER] DataFrame chargé : {df.shape}")
 
+        # Étape 6 : préparer la décision d'Atlas. decision_atlas sera appelée PAR le nettoyeur, au bon moment
         # Atlas décide du traitement des cases vides à partir de la fiche d'identité (titre et description aident)
         infos_jeu = {}
         if fichier_id_existant or fichier_id:
@@ -369,16 +412,19 @@ async def analyser(
             fiche = fiche_identite(df_presque_propre, infos_jeu.get("titre") or fichier.filename, infos_jeu.get("description") or "")
             return choisir_traitement_manquants(fiche)
 
+        # Étape 7 : nettoyeur.py nettoie (et consulte Atlas), puis rapport.py résume ce qui a été fait
         nettoyage = nettoyer(df, inspection["colonnes"], decision_atlas)
         rapport = generer_rapport(inspection, nettoyage)
         rapport["roles_atlas"] = nettoyage.get("roles_atlas") or {}  # repris par le dashboard
 
+        # Étape 8 : ce qui sera enregistré : l'inspection, le rapport et un aperçu des premières lignes
         resultats = {
             "inspection": inspection,
             "rapport": rapport,
             "apercu": inspection.get("apercu", []),
         }
 
+        # Étape 9 : enregistrer le rapport dans la table analyses, et l'empreinte dans jeux_de_donnees
         id_a_sauvegarder = fichier_id_existant or fichier_id
         if id_a_sauvegarder:
             print(f"[ANALYSER] Sauvegarde en base pour fichier_id={id_a_sauvegarder}...")
@@ -393,6 +439,7 @@ async def analyser(
                 .execute()
             print(f"[ANALYSER] ✓ Sauvegarde réussie")
 
+            # Étape 10 : préparer le dashboard (Parquet + file d'attente) ; il sera créé en arrière-plan
             # Dashboard automatique : jamais bloquant pour le rapport, qui est déjà enregistré
             try:
                 preparer_dashboard(id_a_sauvegarder, nettoyage["df_nettoye"], hash_fichier)
@@ -401,6 +448,7 @@ async def analyser(
         else:
             print(f"[ANALYSER] Aucun id_a_sauvegarder — analyse non persistée")
 
+        # Étape 11 : répondre au site avec le rapport
         print(f"[ANALYSER] ✓ Terminé avec succès\n")
         return _nettoyer_nan({
             **resultats,
@@ -409,6 +457,7 @@ async def analyser(
             "fichier_id_existant": fichier_id_existant,
         })
 
+    # En cas d'erreur : l'analyse est marquée « erreur » ; la relance automatique réessaiera
     except HTTPException:
         raise
     except Exception as e:
@@ -420,10 +469,14 @@ async def analyser(
             ).eq("fichier_id", id_erreur).execute()
         raise HTTPException(status_code=500, detail=str(e))
 
+    # Dans tous les cas, le fichier temporaire est supprimé
     finally:
         os.unlink(chemin_tmp)
 
 
+# ─── ROUTE /verifier-doublon : appelée dès que l'utilisateur choisit un fichier, avant de publier ───
+# Démarche : 1. même contenu déjà publié par lui ?  2. nouvelle version d'un de ses jeux ?  3. même contenu chez un autre ?
+# Le site affiche ensuite le bon message (déjà publié, nouvelle version ou nouveau jeu).
 @app.post("/verifier-doublon")
 async def verifier_doublon(
     fichier: UploadFile = File(...),
@@ -541,6 +594,7 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
         for a in analyses
     }
 
+    # On compare avec chaque jeu qui a les mêmes colonnes, et on garde celui qui a le plus de lignes en commun
     meilleur_jeu, meilleur_pct, identique = None, None, False
     for jeu in jeux:
         colonnes = colonnes_par_jeu.get(str(jeu["id"]))
@@ -562,6 +616,7 @@ def _chercher_nouvelle_version(chemin_tmp: str, nom_fichier: str, utilisateur_id
     return meilleur_jeu, meilleur_pct, False
 
 
+# ─── ROUTE /suggerer : Atlas propose un titre, une description et une catégorie (agent.py, fonction suggerer) ───
 @app.post("/suggerer")
 async def suggerer(fichier: UploadFile = File(...)):
     print(f"\n[SUGGERER] ── Fichier reçu : {fichier.filename}")
@@ -591,18 +646,21 @@ def filtrer_dashboard(requete: RequeteFiltre):
     On relance les requêtes déjà écrites par Atlas : l'IA n'est PAS appelée, donc aucun token.
     (Fonction non async : FastAPI l'exécute à part, sans bloquer le reste du serveur.)
     """
+    # 1. Lire le dashboard enregistré : il contient les requêtes SQL écrites par Atlas
     res = supabase.table("dashboards").select("statut, contenu, chemin_propre") \
         .eq("jeu_de_donnees_id", requete.jeu_id).maybe_single().execute()
     if not res or not res.data or res.data.get("statut") != "termine" or not res.data.get("contenu"):
         raise HTTPException(status_code=404, detail="Dashboard indisponible.")
     contenu = res.data["contenu"]
 
+    # 2. Garder seulement les filtres prévus, et retrouver le fichier propre
     # Seuls les filtres prévus par le dashboard sont acceptés
     autorises = {f["colonne"] for f in contenu.get("filtres") or []}
     filtres = {col: valeurs for col, valeurs in requete.filtres.items() if col in autorises and valeurs}
     chemin = _fichier_propre_local(requete.jeu_id, res.data["chemin_propre"])
     colonnes_calculees = contenu.get("colonnes_calculees") or []
 
+    # 3. Relancer chaque requête avec les filtres (DuckDB, dans requetes.py) : les chiffres clés, puis les graphiques
     kpi = []
     for k in contenu.get("kpi") or []:
         if not k.get("sql"):
@@ -617,9 +675,11 @@ def filtrer_dashboard(requete: RequeteFiltre):
         resultat = mettre_en_forme_resultat(r, g["x"], g.get("serie")) if r["ok"] else None
         graphiques.append({"id": g["id"], "resultat": _nettoyer_nan(resultat) if resultat else None})
 
+    # 4. Renvoyer les nouveaux chiffres : le site redessine les graphiques
     return {"filtres": filtres, "kpi": _nettoyer_nan(kpi), "graphiques": graphiques}
 
 
+# ─── ROUTE /chat : Atlas répond à une question sur un jeu de données (agent.py, fonction chat) ───
 @app.post("/chat")
 async def route_chat(requete: RequeteChat):
     try:

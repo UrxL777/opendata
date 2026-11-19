@@ -9,6 +9,7 @@ propre (format Parquet), sans que la requête puisse toucher à autre chose :
   4. le résultat est limité à LIMITE_LIGNES lignes et à DUREE_MAX secondes.
 """
 
+# Utilisé par analyste.py (les requêtes d'Atlas) et par la route /dashboard/filtrer (les filtres du site).
 import datetime
 import decimal
 import math
@@ -166,25 +167,30 @@ def executer_requete(chemin: str, sql: str, filtres: dict | None = None,
     Rend {"ok": True, "colonnes": [...], "lignes": [[...], ...], "tronque": bool}
     ou   {"ok": False, "erreur": "message"}.
     """
+    # 1. Vérifier la requête : lecture seule, aucun mot interdit
     probleme = verifier_sql(sql)
     if probleme:
         return {"ok": False, "erreur": probleme}
 
+    # 2. Une base DuckDB en mémoire, avec un minuteur de DUREE_MAX secondes
     requete = _sans_commentaires(sql).strip().rstrip(";").strip()
     con = duckdb.connect(":memory:")
     minuteur = threading.Timer(DUREE_MAX, con.interrupt)
     try:
+        # 3. Charger le jeu (filtres appliqués) dans la table donnees
         _charger(con, chemin, filtres, colonnes_calculees)
 
         # DuckDB ne peut déjà plus lire de fichier ; on bloque aussi tout changement de réglage
         con.execute("SET lock_configuration = true")
 
+        # 4. Exécuter la requête : LIMITE_LIGNES + 1 lignes au plus (la ligne en plus dit si le résultat est coupé)
         minuteur.start()
         curseur = con.execute(f"SELECT * FROM ({requete}) AS resultat LIMIT {LIMITE_LIGNES + 1}")
         noms = [d[0] for d in curseur.description]
         lignes = curseur.fetchall()
         minuteur.cancel()
 
+        # 5. Rendre le résultat en valeurs JSON (dates en texte, NaN → null)
         tronque = len(lignes) > LIMITE_LIGNES
         lignes = [[_valeur_json(v) for v in ligne] for ligne in lignes[:LIMITE_LIGNES]]
         return {"ok": True, "colonnes": noms, "lignes": lignes, "tronque": tronque}

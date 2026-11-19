@@ -1,3 +1,12 @@
+# ═══ ATLAS : les appels à l'IA (Groq) ════════════════════════════════════════════
+# Ce fichier contient tout ce qui parle au modèle d'IA, sauf la création du dashboard (analyste.py).
+# Les missions d'Atlas dans ce fichier :
+#   1. suggerer()                     : à la publication, proposer titre, description et catégorie (/suggerer)
+#   2. choisir_traitement_manquants() : au nettoyage, corriger les rôles faux et décider des cases vides
+#   3. chat()                         : répondre aux questions dans le panneau de chat (/chat)
+#   4. des outils pour analyste.py    : _appeler_analyste, mise en forme des résultats, filtres, devises
+# Partout la même idée : Atlas propose, Python vérifie avant d'utiliser sa réponse.
+# ═════════════════════════════════════════════════════════════════════════════════
 import os
 import json
 import re
@@ -10,11 +19,13 @@ from modules.requetes import executer_requete
 
 load_dotenv()
 
+# Connexion à Groq (compatible avec la bibliothèque OpenAI) ; la clé vient des variables d'environnement
 client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY"),
     base_url="https://api.groq.com/openai/v1",
 )
 
+# Connexion à Supabase, pour lire les jeux, les rapports et les dashboards
 supabase = create_client(
     os.getenv("SUPABASE_URL"),
     os.getenv("SUPABASE_SERVICE_KEY"),
@@ -37,11 +48,13 @@ def completion_avec_secours(**parametres):
     la même demande est envoyée automatiquement au modèle de secours : l'utilisateur reçoit
     quand même une réponse, sans rien voir.
     """
+    # 1. On essaie le modèle principal
     try:
         return client.chat.completions.create(model=MODELE, **parametres)
     except Exception as e:
         if not _limite_ou_indisponible(e):
             raise
+        # 2. Quota épuisé : la même demande part au modèle de secours
         print(f"[SECOURS] Modèle principal indisponible ({str(e)[:120]}) → modèle de secours {MODELE_SECOURS}")
         reponse = client.chat.completions.create(model=MODELE_SECOURS, **parametres)
         # Certains modèles écrivent leur réflexion entre <think> et </think> : on ne garde que la réponse
@@ -58,6 +71,7 @@ def _lire_echantillon(chemin: str, nom_fichier: str) -> str:
     print(f"[AGENT] _lire_echantillon : {nom_fichier} ({chemin})")
     try:
         ext = os.path.splitext(nom_fichier)[1].lower()
+        # 1. Lire le fichier selon son format (pour un CSV, on essaie plusieurs encodages)
         if ext == ".csv":
             df = None
             for enc in ["utf-8", "latin-1", "cp1252"]:
@@ -77,6 +91,7 @@ def _lire_echantillon(chemin: str, nom_fichier: str) -> str:
             print(f"[AGENT] Format non supporté : {ext}")
             return "Format non supporté pour la lecture d'échantillon."
 
+        # 2. 10 lignes du début, 5 du milieu, 10 de la fin : un aperçu varié, sans envoyer tout le fichier
         total = len(df)
         milieu = total // 2
 
@@ -100,6 +115,8 @@ def _lire_echantillon(chemin: str, nom_fichier: str) -> str:
 
 # ─── Prompt système ────────────────────────────────────────────────────────────
 
+# La consigne d'Atlas pour le chat : sa personnalité, comment réagir selon la question, ses règles.
+# Le contexte (le jeu de données et son dashboard) est ajouté à la fin.
 def prompt_systeme(contexte: str) -> str:
     return f"""Tu es Atlas, l'assistant data analyst de la plateforme OpenData. Tu accompagnes les étudiants et analystes dans l'exploration de leurs données pour construire leur portfolio.
 
@@ -186,6 +203,7 @@ def construire_contexte(jeu_id: str) -> str:
     """Récupère les infos du jeu de données et le rapport d'analyse depuis Supabase."""
     print(f"[AGENT] construire_contexte : jeu_id={jeu_id}")
     try:
+        # 1. Le jeu : titre, description, fichiers
         rep_jeu = supabase.table("jeux_de_donnees") \
             .select("titre, description, fichiers(id, nom_fichier)") \
             .eq("id", jeu_id) \
@@ -203,6 +221,7 @@ def construire_contexte(jeu_id: str) -> str:
 
         print(f"[AGENT] Jeu trouvé : '{jeu.get('titre')}' | {len(fichiers)} fichier(s)")
 
+        # 2. Le rapport d'analyse : colonnes, dimensions, qualité, aperçu
         rapport = {}
         apercu = []
         try:
@@ -229,6 +248,7 @@ def construire_contexte(jeu_id: str) -> str:
             print(f"[AGENT] ✗ Erreur récupération analyse : {e}")
 
         # Le dashboard automatique de l'Analyste, pour qu'Atlas puisse l'expliquer
+        # 3. Le dashboard (s'il est prêt), résumé en texte avec ses vrais chiffres
         texte_dash = ""
         try:
             rep_dash = supabase.table("dashboards") \
@@ -244,6 +264,7 @@ def construire_contexte(jeu_id: str) -> str:
         except Exception as e:
             print(f"[AGENT] ✗ Erreur récupération dashboard : {e}")
 
+        # 4. Tout est assemblé en un seul texte : c'est ce qu'Atlas lit avant de répondre
         lignes = [
             f"Jeu de données : {jeu.get('titre', 'Sans titre')}",
             f"Description : {jeu.get('description', 'Aucune description.')}",
@@ -295,6 +316,8 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
     """Suggère un titre, une description et une catégorie pour un jeu de données."""
     print(f"\n[SUGGERER-AGENT] ── fichier={nom_fichier}")
 
+    # Démarche : 1. les catégories existantes  2. un échantillon du fichier  3. Atlas répond en JSON
+    #            4. Python vérifie la réponse et crée la catégorie si Atlas en propose une nouvelle
     # Récupérer les catégories disponibles depuis Supabase
     categories = []
     try:
@@ -304,6 +327,7 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
     except Exception as e:
         print(f"[SUGGERER-AGENT] ✗ Erreur récupération catégories : {e}")
 
+    # 2. Un échantillon du fichier (1 000 caractères au plus, pour économiser les tokens)
     echantillon = _lire_echantillon(chemin, nom_fichier)
     echantillon_court = echantillon[:1000]
     print(f"[SUGGERER-AGENT] Échantillon envoyé ({len(echantillon_court)} chars)")
@@ -311,6 +335,7 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
     liste_cats = "\n".join([f"- id {c['id']} : {c['nom']}" for c in categories])
 
     try:
+        # 3. Atlas répond : titre, description, et une catégorie existante ou nouvelle
         reponse = completion_avec_secours(
             messages=[
                 {
@@ -344,6 +369,7 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
         contenu = reponse.choices[0].message.content.strip()
         print(f"[SUGGERER-AGENT] Réponse brute du modèle : {contenu}")
 
+        # 4. Python extrait le JSON ; si Atlas a mal répondu, le nom du fichier sert de titre
         match = re.search(r'\{.*\}', contenu, re.DOTALL)
         if not match:
             print(f"[SUGGERER-AGENT] ✗ Aucun JSON trouvé, fallback")
@@ -467,8 +493,10 @@ def choisir_traitement_manquants(fiche: dict) -> dict:
     Le nettoyeur vérifie ces choix avant de les appliquer.
     Un seul appel au modèle ; la fiche a la même taille quel que soit le nombre de lignes du fichier.
     """
+    # 1. Les colonnes qui ont des cases vides (pour le journal)
     avec_vides = [c["nom"] for c in fiche["colonnes"] if c.get("nb_manquants", 0) > 0]
     print(f"[NETTOYAGE] Atlas décide pour {len(avec_vides)} colonne(s) avec des cases vides : {avec_vides}")
+    # 2. Un seul appel : la consigne + la fiche allégée (jamais les données elles-mêmes)
     reponse = completion_avec_secours(
         messages=[
             {"role": "system", "content": PROMPT_MANQUANTS},
@@ -479,6 +507,7 @@ def choisir_traitement_manquants(fiche: dict) -> dict:
         max_tokens=2000,
         timeout=40,
     )
+    # 3. Lire le JSON d'Atlas ; nettoyeur.py vérifiera chaque choix avant de l'appliquer
     texte = reponse.choices[0].message.content or ""
     debut, fin = texte.find("{"), texte.rfind("}")
     decision = json.loads(texte[debut:fin + 1])
@@ -516,6 +545,8 @@ def _appeler_analyste(messages: list[dict], etape: str) -> dict:
     Appelle le modèle et rend sa réponse JSON.
     Réessaie si le modèle se trompe de format, et attend si la limite de Groq est atteinte.
     """
+    # Démarche : appel → lecture du JSON. Si Groq dit « limite atteinte », on attend puis on réessaie.
+    # Si la réponse n'est pas un JSON correct, on réessaie avec un rappel (3 essais au maximum).
     messages_envoyes = list(messages)
     attentes = 0
     essai = 0
@@ -643,9 +674,11 @@ def retirer_devises_inventees(texte: str, reference: str) -> str:
 def chat(jeu_id: str, messages: list[dict]) -> str:
     """Répond à un message de l'utilisateur dans le contexte du jeu de données."""
     print(f"\n[CHAT] ── jeu_id={jeu_id} | {len(messages)} message(s) dans l'historique")
+    # 1. Le contexte du jeu (lu dans Supabase) et la consigne d'Atlas
     contexte = construire_contexte(jeu_id)
     prompt = prompt_systeme(contexte)
 
+    # 2. La mémoire : les 8 derniers messages de la conversation (envoyés par le site)
     messages_recents = messages[-8:]
     dernier_msg = messages_recents[-1].get("content", "")[:150] if messages_recents else ""
     print(f"[CHAT] Dernier message : {dernier_msg}")
@@ -660,6 +693,7 @@ def chat(jeu_id: str, messages: list[dict]) -> str:
                 messages=messages_envoyes,
                 max_tokens=1500,
             )
+            # 3. La réponse d'Atlas, contrôlée par Python avant d'être renvoyée au site
             resultat = reponse.choices[0].message.content or ""
             # Les devises absentes du jeu de données sont retirées (sauf dans les blocs de code)
             morceaux = resultat.split("```")
