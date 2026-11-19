@@ -350,6 +350,8 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
                         "OU 'nouvelle_categorie' (string, un nom de catégorie court et précis) "
                         "si et seulement si AUCUNE catégorie existante ne correspond au contenu du fichier. "
                         "N'utilise 'nouvelle_categorie' qu'en dernier recours absolu. "
+                        "N'ajoute jamais un pays, une ville, une période ou une source qui n'apparaît pas "
+                        "dans le nom du fichier ou dans l'aperçu. "
                         "Aucun texte avant ou après le JSON. "
                         "Le titre, la description et la nouvelle catégorie doivent TOUJOURS être rédigés en français."
                     ),
