@@ -1,3 +1,12 @@
+# ═══ L'INSPECTEUR : Python examine le fichier, sans rien modifier ═══════════════════
+# Démarche (fonction inspecter) :
+#   1. lire le fichier (CSV, Excel ou JSON)
+#   2. pour chaque colonne : compter les cases vides et les valeurs différentes, deviner son rôle
+#      (nombre à calculer, groupe, date, identifiant, texte libre)
+#   3. compter les lignes en double et les colonnes vides
+#   4. rendre un résumé (inspection) et un aperçu des 5 premières lignes
+# fiche_identite() (en bas) décrit le jeu PROPRE pour Atlas : des statistiques, jamais les données.
+# ═════════════════════════════════════════════════════════════════════════════════
 import re
 import warnings
 import pandas as pd
@@ -135,6 +144,7 @@ def inspecter(chemin: str, nom_fichier: str) -> dict:
     Point d'entrée principal de l'inspecteur.
     Retourne un dictionnaire complet décrivant le fichier.
     """
+    # 1. Lire le fichier ; s'il est illisible ou vide, on s'arrête avec un message clair
     try:
         df = lire_fichier(chemin, nom_fichier)
     except Exception as e:
@@ -178,6 +188,7 @@ def inspecter(chemin: str, nom_fichier: str) -> dict:
     total_manquants = sum(c["nb_manquants"] for c in colonnes)
     pct_manquants_global = round(total_manquants / total_cellules * 100, 1) if total_cellules > 0 else 0
 
+    # 4. Le résumé complet : enregistré dans le rapport et lu par le site
     return {
         "lisible": True,
         "nom_fichier": nom_fichier,
@@ -249,6 +260,8 @@ def fiche_identite(df: pd.DataFrame, titre: str = "", description: str = "", rol
     nb_lignes, nb_colonnes = df.shape
     colonnes = []
 
+    # Pour chaque colonne, des statistiques adaptées à son rôle :
+    # nombres → min, max, moyenne ; groupes → valeurs fréquentes ; dates → première et dernière ; autres → 3 exemples
     for nom in df.columns:
         serie = df[nom]
         # Un rôle corrigé par Atlas au nettoyage (et accepté par le serveur) remplace celui deviné par Python

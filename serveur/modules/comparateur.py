@@ -1,5 +1,6 @@
 # ─── Comparaison d'un nouveau fichier avec un jeu déjà publié ─────────────────
 #
+# Utilisé par la route /verifier-doublon (main.py) quand l'utilisateur choisit un fichier.
 # Règle : mêmes colonnes ET au moins 70 % des lignes de l'ancien fichier
 # retrouvées dans le nouveau = nouvelle version du jeu.
 # Tout le reste = nouveau jeu de données.
@@ -48,6 +49,7 @@ def pourcentage_lignes_communes(df_ancien: pd.DataFrame, df_nouveau: pd.DataFram
     nouveau = pd.DataFrame({i: _valeurs_texte(df_nouveau[noms_nouveaux[normaliser_nom(c)]])
                             for i, c in enumerate(colonnes)})
 
+    # Chaque ligne reçoit une empreinte ; on compte les lignes de l'ancien fichier retrouvées dans le nouveau
     hash_anciens = pd.util.hash_pandas_object(ancien, index=False)
     hash_nouveaux = set(pd.util.hash_pandas_object(nouveau, index=False))
     return round(float(hash_anciens.isin(hash_nouveaux).mean()) * 100, 1)
