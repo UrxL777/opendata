@@ -152,8 +152,8 @@ Règles pour les requêtes :
 - DuckDB, uniquement SELECT, sur la table donnees ; noms de colonnes exacts entre guillemets doubles ; seulement les colonnes utiles.
 - Le résultat a deux colonnes : la première pour l'axe x, la seconde pour la valeur.
 - Arrondis les valeurs à 2 décimales et exclus les lignes où la colonne de l'axe x est vide.
-- Pour une évolution sur des dates, regroupe par mois avec strftime(colonne, '%Y-%m'). Garde toutes les périodes.
-- Pour un classement de plus de 20 éléments, garde les 10 premiers et les 10 derniers.
+- Pour une évolution sur des dates, regroupe par mois avec strftime(colonne, '%Y-%m'), ou par année avec strftime(colonne, '%Y') si les dates couvrent plus de 4 ans. Garde toutes les périodes : on ne coupe jamais une évolution.
+- Pour un classement de plus de 20 éléments, garde les 10 premiers et les 10 derniers (jamais pour une évolution).
 - Pour une mesure qui ne s'additionne pas (prix, taux, moyenne, valeur par habitant), utilise la moyenne.
 - Le titre d'une évolution indique la période couverte et l'unité de temps.
 Pour chaque graphique : "titre" (clair pour quelqu'un qui n'est pas du domaine), "type" ("barres" ou "courbe"), "libelle_x", "libelle_y" (noms d'axes courts en français, sans format technique comme YYYY-MM), "sql".
@@ -170,6 +170,17 @@ def _periode_lisible(v) -> str:
     return f"{MOIS[int(m.group(2)) - 1]} {m.group(1)}" if m else str(v)
 
 
+def _en_mois(valeurs: list) -> list | None:
+    """« 2011-04 » ou « 2011 » → numéro de mois (pour mesurer les écarts) ; None si ce ne sont pas des périodes."""
+    mois = []
+    for v in valeurs:
+        m = re.match(r"^(\d{4})(?:-(\d{2}))?$", str(v).strip())
+        if not m:
+            return None
+        mois.append(int(m.group(1)) * 12 + int(m.group(2) or 1))
+    return mois if mois == sorted(mois) else None
+
+
 def _probleme_resultat(res: dict, type_graphique: str) -> str | None:
     """Rend la raison pour laquelle un résultat n'est pas utilisable, sinon None."""
     if not res["ok"]:
@@ -179,8 +190,18 @@ def _probleme_resultat(res: dict, type_graphique: str) -> str | None:
         return "Le résultat doit avoir deux colonnes (x puis la valeur) et au moins une ligne."
     if not all(isinstance(l[1], (int, float)) and not isinstance(l[1], bool) for l in lignes if l[1] is not None):
         return "La deuxième colonne du résultat doit être un nombre."
+    periodes = _en_mois([l[0] for l in lignes])
     if res["tronque"]:
+        if type_graphique == "courbe" or periodes:
+            # Une évolution trop longue est regroupée par année : elle n'est jamais coupée
+            return "Le résultat dépasse 50 lignes : regroupe les dates par année avec strftime(colonne, '%Y'). Ne coupe jamais une évolution."
         return "Le résultat dépasse 50 lignes : regroupe davantage, ou garde les 10 premiers et les 10 derniers."
+    if periodes and len(periodes) > 2:
+        # Contrôle Python : une évolution ne doit pas sauter une grande partie de la période
+        ecarts = sorted(b - a for a, b in zip(periodes, periodes[1:]))
+        if ecarts[-1] > 12 and ecarts[-1] > 3 * ecarts[len(ecarts) // 2]:
+            return (f"Il manque {ecarts[-1] - 1} mois au milieu de l'évolution : garde toutes les périodes. "
+                    "Si le résultat est trop long, regroupe les dates par année avec strftime(colonne, '%Y').")
     if type_graphique == "courbe" and len(lignes) > MAX_POINTS_DATES and re.match(r"^\d{4}-\d{2}-\d{2}", str(lignes[0][0])):
         return "Trop de points jour par jour : regroupe les dates par mois avec strftime(colonne, '%Y-%m')."
     return None
@@ -216,7 +237,7 @@ PROMPT_MESSAGE = """Tu es Atlas, data analyst. Tu reçois la question phare d'un
 - "graphiques" : pour chaque graphique reçu, avec le même "id" : un "texte" de deux à quatre phrases qui disent ce que montre le graphique.
 - "chiffres_cles" : deux ou trois chiffres importants tirés des résultats, chacun avec "titre" (court), "valeur" (le chiffre, avec l'unité si elle est donnée) et "detail" (qui ou quand).
 - "noms_filtres" : pour chaque colonne de "filtres", un nom court en français qui dit ce qu'elle contient, en traduisant les noms anglais (ex. pour une colonne « sex » : « Sexe »).
-- "nom_mesure" : le nom court en français de la moyenne de la mesure étudiée (ex. « Prix moyen », « Consommation moyenne »).
+- "nom_mesure" : le nom court en français de la moyenne de la colonne donnée dans "mesure" (ex. « Prix moyen », « Consommation moyenne »).
 
 Règles :
 - Utilise seulement les chiffres des résultats. Tu peux les écrire avec moins de décimales si c'est plus lisible, en arrondissant selon la règle : 5 et plus vers le haut. N'écris pas de zéros inutiles après la virgule, ni « environ » ou « ~ ». Ne calcule rien toi-même.
@@ -367,10 +388,12 @@ def _reperes(graphique: dict) -> dict:
     return reperes
 
 
-def ecrire_message(question: str, graphiques: list, unite: str | None, reference: str, filtres: list) -> dict:
+def ecrire_message(question: str, graphiques: list, unite: str | None, reference: str, filtres: list,
+                   mesure: dict | None = None) -> dict:
     """Atlas écrit le texte ; Python refuse les chiffres inventés et les causes (2 réécritures), puis nettoie."""
     # 1. Atlas reçoit la question, les résultats exacts et les repères (le plus haut, le plus bas…)
-    entree = json.dumps({"question_phare": question, "unite_mesure": unite, "filtres": [f["colonne"] for f in filtres],
+    entree = json.dumps({"question_phare": question, "unite_mesure": unite, "mesure": mesure,
+                         "filtres": [f["colonne"] for f in filtres],
                          "graphiques": [{"id": g["id"], "titre": g["titre"], "colonnes": g["resultat"]["colonnes"],
                                          "lignes": g["resultat"]["lignes"], **_reperes(g)} for g in graphiques]},
                         ensure_ascii=False, default=str)
@@ -403,6 +426,9 @@ def ecrire_message(question: str, graphiques: list, unite: str | None, reference
         if not _phrase_acceptable(f"{k['valeur']} {k['detail']}", autorises):
             continue
         detail = re.sub(r",?\s*\(?\d[\d\s ]*lignes?\)?", "", k["detail"]).strip(" ,")
+        # Les noms des repères de Python (le_plus_haut…) ne doivent pas apparaître tels quels
+        for cle, mots in {"le_plus_haut": "le plus haut", "le_plus_bas": "le plus bas", "debut": "début", "fin": "fin"}.items():
+            detail = re.sub(rf"\b{cle}\b", mots, detail)
         cles.append({"titre": net(k["titre"]), "valeur": net(k["valeur"]), "detail": net(detail)})
     msg["chiffres_cles"] = cles
     msg["noms_filtres"] = {str(k): str(v).strip()[:40] for k, v in noms_filtres.items() if str(v).strip()}
@@ -493,7 +519,9 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
             filtres.insert(0, {"colonne": "mois", "valeurs": valeurs, "libelle": "Mois"})
 
     # 5. Atlas écrit le texte, Python le contrôle
-    msg = ecrire_message(question, graphiques, desc["unite_mesure"], reference, filtres)  # Atlas écrit, Python contrôle
+    mesure_moyenne = next(({"colonne": c["nom"], "description": c["description"]} for c in desc["colonnes"]
+                           if c["nom"] == desc["mesure_principale"]), None)
+    msg = ecrire_message(question, graphiques, desc["unite_mesure"], reference, filtres, mesure_moyenne)  # Atlas écrit, Python contrôle
     textes = {g["id"]: g["texte"] for g in msg["graphiques"]}
     for g in graphiques:
         g["phrase"] = textes.get(g["id"], "")
