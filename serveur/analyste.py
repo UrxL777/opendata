@@ -191,7 +191,7 @@ def executer_graphique(chemin: str, graphique: dict, colonnes_utiles: list) -> d
     sql, type_graphique = str(graphique.get("sql") or ""), graphique.get("type")
     # Boucle : exécuter → vérifier le résultat → si problème, Atlas corrige la requête → réessayer
     for essai in range(MAX_ESSAIS):
-        res = executer_requete(chemin, sql)
+        res = executer_requete(chemin, sql)  # exécution avec DuckDB
         probleme = _probleme_resultat(res, type_graphique)
         if not probleme:
             graphique["sql"] = sql
@@ -199,7 +199,7 @@ def executer_graphique(chemin: str, graphique: dict, colonnes_utiles: list) -> d
         print(f"[ANALYSTE] Requête refusée (essai {essai + 1}) : {probleme}")
         if essai == MAX_ESSAIS - 1:
             break
-        correction = _appeler_analyste([
+        correction = _appeler_analyste([  # en cas d'erreur, Atlas corrige (3 essais)
             {"role": "system", "content": PROMPT_CORRIGER},
             {"role": "user", "content": json.dumps({"sql": sql, "raison": probleme, "colonnes": colonnes_utiles},
                                                    ensure_ascii=False)},
@@ -382,8 +382,8 @@ def ecrire_message(question: str, graphiques: list, unite: str | None, reference
     msg = _normaliser(brut)
     # 3. Contrôle : un nombre inventé ou un mot de cause → Atlas réécrit (2 fois au maximum)
     for essai in range(2):
-        faux = _inconnus(_textes(msg), autorises)
-        causes = sorted({m.group(0).lower() for m in re.finditer(MOTS_DE_CAUSE, _textes(msg), re.I)})
+        faux = _inconnus(_textes(msg), autorises)  # chiffres absents des résultats ?
+        causes = sorted({m.group(0).lower() for m in re.finditer(MOTS_DE_CAUSE, _textes(msg), re.I)})  # mots de cause ? → Atlas réécrit
         if not faux and not causes:
             break
         print(f"[ANALYSTE] Texte refusé : nombres absents {faux}, mots de cause {causes} → Atlas réécrit")
@@ -421,11 +421,11 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
     print(f"\n[ANALYSTE] ── Début de l'analyse : {titre or '(sans titre)'}")
     # 0. Python lit le jeu propre en entier et résume chaque colonne (profil)
     df = pd.read_parquet(chemin_propre) if chemin_propre.endswith(".parquet") else pd.read_csv(chemin_propre)
-    profil = profiler(df)
+    profil = profiler(df)  # Python résume chaque colonne
     reference = " ".join([titre, description] + [str(c) for c in df.columns])
 
     # 1-2. Python donne les faits, Atlas décrit et choisit les colonnes
-    desc = decrire_colonnes(profil, titre, description)
+    desc = decrire_colonnes(profil, titre, description)  # Atlas décrit et choisit les colonnes
     gardees = [c["nom"] for c in desc["colonnes"] if c["gardee"]]
     print(f"[ANALYSTE] Colonnes gardées par Atlas : {gardees}")
     if not gardees:
@@ -434,7 +434,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
               for c in profil["colonnes"] if c["nom"] in gardees]
 
     # 3. Atlas : question phare et requêtes SQL
-    plan = _appeler_analyste([
+    plan = _appeler_analyste([  # Atlas : question phare + SQL
         {"role": "system", "content": PROMPT_PLAN},
         {"role": "user", "content": json.dumps({"titre": titre, "description": desc["description_jeu"],
                                                 "colonnes_utiles": utiles}, ensure_ascii=False, default=str)},
@@ -446,7 +446,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
     # 4. Python exécute (Atlas corrige en cas d'erreur)
     graphiques = []
     for i, g in enumerate([g for g in (plan.get("graphiques") or []) if isinstance(g, dict)][:MAX_GRAPHIQUES], 1):
-        res = executer_graphique(chemin_propre, g, gardees)
+        res = executer_graphique(chemin_propre, g, gardees)  # Python exécute le SQL
         if res is None:
             continue
         x, y = res["colonnes"][0], res["colonnes"][1]
@@ -493,7 +493,7 @@ def analyser_dataset(fiche: dict, chemin_propre: str) -> dict:
             filtres.insert(0, {"colonne": "mois", "valeurs": valeurs, "libelle": "Mois"})
 
     # 5. Atlas écrit le texte, Python le contrôle
-    msg = ecrire_message(question, graphiques, desc["unite_mesure"], reference, filtres)
+    msg = ecrire_message(question, graphiques, desc["unite_mesure"], reference, filtres)  # Atlas écrit, Python contrôle
     textes = {g["id"]: g["texte"] for g in msg["graphiques"]}
     for g in graphiques:
         g["phrase"] = textes.get(g["id"], "")

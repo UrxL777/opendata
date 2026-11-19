@@ -195,7 +195,7 @@ function FormulaireDataset({ onFermer }) {
       const jeuAMettreAJour = choixRequis && choix === 'maj' ? comparaison.jeu : null
 
       const cheminFichier = `${utilisateur.id}/${horodatage()}_${nomFichier}`
-      const { error: erreurUpload } = await supabase.storage.from('jeux-donnees').upload(cheminFichier, fichier)
+      const { error: erreurUpload } = await supabase.storage.from('jeux-donnees').upload(cheminFichier, fichier)  // le fichier part dans le stockage Supabase
       if (erreurUpload) { setErreur(erreurUpload.message); setChargement(false); return }
 
       let jeuId
@@ -216,19 +216,19 @@ function FormulaireDataset({ onFermer }) {
         }
       } else {
         // Nouveau jeu de données
-        const { data: jeu, error: erreurJeu } = await supabase.from('jeux_de_donnees').insert({ titre, description, source, categorie_id: categorieId || null, utilisateur_id: utilisateur.id, hash_fichier, visible: true }).select().single()
+        const { data: jeu, error: erreurJeu } = await supabase.from('jeux_de_donnees').insert({ titre, description, source, categorie_id: categorieId || null, utilisateur_id: utilisateur.id, hash_fichier, visible: true }).select().single()  // le jeu est créé dans la table jeux_de_donnees
         if (erreurJeu) { setErreur(erreurJeu.message); setChargement(false); return }
         jeuId = jeu.id
         await supabase.from('fichiers').insert({ nom_fichier: nomFichier, chemin_stockage: cheminFichier, format: ext, taille: fichier.size, jeu_de_donnees_id: jeuId })
       }
 
-      await supabase.from('analyses').upsert({ fichier_id: jeuId, statut: 'en_attente' }, { onConflict: 'fichier_id' })
+      await supabase.from('analyses').upsert({ fichier_id: jeuId, statut: 'en_attente' }, { onConflict: 'fichier_id' })  // l'analyse est marquée « en attente »
       const formAnalyse = new FormData()
       formAnalyse.append('fichier', fichier)
-      fetch(`${import.meta.env.VITE_API_URL}/analyser?fichier_id=${jeuId}`, { method: 'POST', body: formAnalyse }).catch(() => {})
+      fetch(`${import.meta.env.VITE_API_URL}/analyser?fichier_id=${jeuId}`, { method: 'POST', body: formAnalyse }).catch(() => {})  // LE DÉCLENCHEUR : le fichier est envoyé au serveur, sans attendre la réponse
 
       onFermer()
-      navigate(`/donnees/${jeuId}`)
+      navigate(`/donnees/${jeuId}`)  // la page du jeu s'ouvre tout de suite
     } catch {
       setErreur('Une erreur est survenue.')
       setChargement(false)
