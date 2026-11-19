@@ -1,3 +1,5 @@
+// ═══ LES NUMÉROS DE PAGE, sous le catalogue et la galerie des dashboards ═══
+
 // Pagination partagée par le catalogue de données et la galerie des dashboards
 export default function Pagination({ pageCourante, totalPages, onChanger }) {
   if (totalPages <= 1) return null

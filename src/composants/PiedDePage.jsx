@@ -1,3 +1,5 @@
+// ═══ LE PIED DE PAGE, en bas de toutes les pages : liens et informations sur OpenData ═══
+
 import { MapPin, Phone, Mail } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import LogOpenData from './LogOpenData'

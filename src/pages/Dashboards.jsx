@@ -1,3 +1,9 @@
+// ═══ LA GALERIE DES DASHBOARDS (adresse /dashboards) ═══
+// Démarche :
+//   1. lire les jeux (vue_jeux_avec_pseudo) et, en même temps, les dashboards (table dashboards)
+//   2. ne lire de chaque dashboard que sa question centrale et ses chiffres clés : la page reste légère
+//   3. une carte par jeu qui a un dashboard (prêt ou en préparation)
+
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Search, ChartColumnBig, Loader2, Clock, CircleAlert } from 'lucide-react'
@@ -85,6 +91,7 @@ export default function Dashboards() {
         requete,
         supabase.from('dashboards').select('jeu_de_donnees_id, statut, question:contenu->comprehension->>question_centrale, kpi:contenu->kpi'),
       ])
+      // On associe chaque jeu à son dashboard ; les jeux sans dashboard ne sont pas affichés
       const parJeu = Object.fromEntries((dashboards ?? []).map(d => [String(d.jeu_de_donnees_id), d]))
       setCartes((jeux ?? []).filter(j => parJeu[String(j.id)]).map(j => ({ jeu: j, dashboard: parJeu[String(j.id)] })))
       setPageCourante(1)

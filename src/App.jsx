@@ -1,3 +1,7 @@
+// ═══ LE PLAN DU SITE ═══
+// App déclare chaque adresse et la page qui s'affiche (React Router).
+// Le menu (Navigation) et le pied de page sont présents sur toutes les pages.
+
 import { useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Navigation from './composants/Navigation'
@@ -24,6 +28,7 @@ export default function App() {
         <Navigation />
         <div className="flex-1">
           <Routes>
+            {/* Une ligne = une adresse → une page */}
             <Route path="/" element={<Accueil />} />
             <Route path="/donnees" element={<Donnees />} />
             <Route path="/donnees/:id" element={<Detail />} />

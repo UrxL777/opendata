@@ -1,3 +1,6 @@
+// ═══ L'ÉCRITURE DES CHIFFRES ET DES DATES DES DASHBOARDS ═══
+// Utilisé par Dashboard.jsx, GraphiqueDashboard.jsx et FiltresDashboard.jsx pour écrire les nombres à la française.
+
 // Mise en forme des chiffres des dashboards (KPI, axes, bulles d'information)
 
 // Au plus 2 décimales, sans zéros inutiles : 11567.56 → « 11 567,56 » ; 3.00 → « 3 » ; 12.5 → « 12,5 »

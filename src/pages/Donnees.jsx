@@ -1,3 +1,9 @@
+// ═══ LE CATALOGUE DES JEUX DE DONNÉES (adresse /donnees) ═══
+// Démarche :
+//   1. charger les catégories (pour le filtre)
+//   2. lire la vue SQL vue_jeux_avec_pseudo : chaque jeu avec le pseudo de son auteur, du plus récent au plus ancien
+//   3. filtrer dans la base par catégorie (eq) et par titre (ilike), puis afficher 10 jeux par page (Pagination)
+
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Search } from 'lucide-react'
@@ -24,17 +30,20 @@ export default function Donnees() {
   const categorieActive = searchParams.get('categorie') ?? ''
 
   useEffect(() => {
+    // 1. Les catégories, pour le menu de filtre
     supabase.from('categories').select('*').then(({ data }) => setCategories(data ?? []))
   }, [])
 
   useEffect(() => {
     async function charger() {
+      // 2. Les jeux visibles avec le pseudo de leur auteur (vue SQL)
       let requete = supabase
         .from('vue_jeux_avec_pseudo')
         .select('*, categories(nom), fichiers(format, taille, telechargements, nom_fichier)')
         .order('cree_le', { ascending: false })
         .eq('visible', true)
 
+      // 3. Filtres faits par la base : catégorie choisie, et titre qui contient la recherche
       if (categorieActive) requete = requete.eq('categorie_id', categorieActive)
       if (recherche) requete = requete.ilike('titre', `%${recherche}%`)
 
@@ -51,6 +60,7 @@ export default function Donnees() {
     setPageCourante(1)
   }
 
+  // Découpage en pages : seuls les jeux de la page courante sont affichés
   const totalPages = Math.ceil(jeux.length / DATASETS_PAR_PAGE)
   const jeuxPage = jeux.slice(
     (pageCourante - 1) * DATASETS_PAR_PAGE,

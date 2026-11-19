@@ -1,3 +1,7 @@
+// ═══ LES MESSAGES D'ERREUR DE CONNEXION, EN FRANÇAIS ═══
+// verifierInscription() contrôle le formulaire AVANT l'envoi (pseudo, email, mot de passe).
+// traduireErreurAuth() traduit les messages anglais de Supabase Auth en phrases claires.
+
 // Traduit en français les messages d'erreur renvoyés par Supabase Auth
 const TRADUCTIONS = [
   [/invalid login credentials/i, 'Email ou mot de passe incorrect.'],

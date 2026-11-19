@@ -1,3 +1,8 @@
+// ═══ LES FILTRES DU DASHBOARD ═══
+// Chaque filtre est une liste de valeurs ; on peut en cocher plusieurs.
+// Dans un même filtre, les valeurs s'ajoutent (OU) ; entre deux filtres, elles se cumulent (ET).
+// Le choix est envoyé à Dashboard.jsx (onChanger), qui demande au serveur de recalculer (/dashboard/filtrer).
+
 import { useEffect, useRef, useState } from 'react'
 import { SlidersHorizontal, ChevronDown, Check } from 'lucide-react'
 import { formaterNombre, libelleValeur } from '../../utilitaires/formatDashboard'

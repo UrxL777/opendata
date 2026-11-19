@@ -1,3 +1,9 @@
+// ═══ PAGE D'ACCUEIL (adresse /) ═══
+// Démarche : au chargement, la page COMPTE dans Supabase (supabase-js) :
+//   1. les jeux visibles, 2. les inscrits, 3. les dashboards terminés, 4. les téléchargements,
+//   5. les jeux de chaque catégorie (pour les cartes).
+// Les chiffres ne sont jamais écrits à la main : ils sont recalculés à chaque visite.
+
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Users, Database, Download, ChartColumnBig } from 'lucide-react'
@@ -19,11 +25,13 @@ export default function Accueil() {
 
   useEffect(() => {
     async function charger() {
+      // 1. Nombre de jeux visibles (count : Supabase compte sans renvoyer les lignes)
       const { count: jeux } = await supabase
         .from('jeux_de_donnees')
         .select('*', { count: 'exact', head: true })
         .eq('visible', true)
 
+      // 2. Nombre d'inscrits (table profiles)
       const { count: utilisateurs } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
@@ -34,11 +42,13 @@ export default function Accueil() {
         .select('*', { count: 'exact', head: true })
         .eq('statut', 'termine')
 
+      // 4. Total des téléchargements : on additionne le compteur de chaque fichier
       const { data: fichiers } = await supabase
         .from('fichiers')
         .select('telechargements')
       const telechargements = fichiers?.reduce((acc, f) => acc + (f.telechargements ?? 0), 0) ?? 0
 
+      // 5. Les catégories, puis le nombre de jeux dans chacune
       const { data: cats } = await supabase
         .from('categories')
         .select('*')
@@ -59,6 +69,7 @@ export default function Accueil() {
         .filter(c => CATEGORIES_ACCUEIL.includes(c.nom))
         .sort((a,b) => CATEGORIES_ACCUEIL.indexOf(a.nom) - CATEGORIES_ACCUEIL.indexOf(b.nom))
 
+      // Les chiffres sont rangés dans l'état (stats) : React met la page à jour
       setStats({ jeux: jeux ?? 0, utilisateurs: utilisateurs ?? 0, telechargements, dashboards: dashboards ?? 0 })
       setCategories(catsAvecCompte)
     }

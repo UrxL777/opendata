@@ -1,3 +1,7 @@
+// ═══ LE MENU, EN HAUT DE TOUTES LES PAGES ═══
+// Liens vers les pages (React Router), bouton Publier (BoutonPublier) et connexion (BoutonConnexion).
+// Sur téléphone, le menu s'ouvre avec un bouton (menuOuvert).
+
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import BoutonPublier from './BoutonPublier'
