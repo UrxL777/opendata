@@ -121,7 +121,7 @@ def _charger(con, chemin: str, filtres: dict | None, colonnes_calculees: list | 
     con.execute(f"CREATE TABLE donnees_brutes AS SELECT * FROM {lecture}({chemin_sql})")
 
     # À partir d'ici, DuckDB ne peut plus lire aucun fichier
-    con.execute("SET enable_external_access = false")
+    con.execute("SET enable_external_access = false")  # DuckDB ne peut plus lire d'autre fichier
 
     # Colonnes calculées (catégorie IMC, tranches d'âge…), chacune vérifiée avant d'être ajoutée
     colonnes = [ligne[0] for ligne in con.execute("DESCRIBE donnees_brutes").fetchall()]
@@ -168,7 +168,7 @@ def executer_requete(chemin: str, sql: str, filtres: dict | None = None,
     ou   {"ok": False, "erreur": "message"}.
     """
     # 1. Vérifier la requête : lecture seule, aucun mot interdit
-    probleme = verifier_sql(sql)
+    probleme = verifier_sql(sql)  # lecture seule, aucun mot interdit
     if probleme:
         return {"ok": False, "erreur": probleme}
 
@@ -185,7 +185,7 @@ def executer_requete(chemin: str, sql: str, filtres: dict | None = None,
 
         # 4. Exécuter la requête : LIMITE_LIGNES + 1 lignes au plus (la ligne en plus dit si le résultat est coupé)
         minuteur.start()
-        curseur = con.execute(f"SELECT * FROM ({requete}) AS resultat LIMIT {LIMITE_LIGNES + 1}")
+        curseur = con.execute(f"SELECT * FROM ({requete}) AS resultat LIMIT {LIMITE_LIGNES + 1}")  # exécution limitée en lignes
         noms = [d[0] for d in curseur.description]
         lignes = curseur.fetchall()
         minuteur.cancel()

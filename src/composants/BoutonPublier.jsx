@@ -1,3 +1,13 @@
+// ═══ PUBLIER UN JEU DE DONNÉES : LE DÉBUT DE TOUTE L'ANALYSE ═══
+// Démarche :
+//   0. pas connecté ? la fenêtre propose d'abord de se connecter ou de s'inscrire (BoutonPublier, en bas)
+//   1. choisirFichier() : format et taille vérifiés, puis DEUX appels au serveur en même temps :
+//        /suggerer         → Atlas propose titre, description, catégorie (le formulaire se remplit)
+//        /verifier-doublon → déjà publié ? nouvelle version d'un de ses jeux ?
+//   2. publier() : le fichier part dans le stockage Supabase, le jeu est créé (ou mis à jour),
+//      l'analyse est marquée « en attente », puis /analyser est appelé SANS attendre la réponse
+//   3. la page du jeu s'ouvre ; le serveur continue l'analyse en arrière-plan
+
 import { useState, useRef, useEffect } from 'react'
 import { Upload, X, Plus, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 import { supabase } from '../supabase'
@@ -86,6 +96,7 @@ function FormulaireDataset({ onFermer }) {
     if (controleurRef.current) controleurRef.current.abort()
     viderFormulaire()
 
+    // 1. Le fichier choisi : on annule les demandes en cours pour un fichier précédent, et on vide le formulaire
     // Format et taille vérifiés avant tout envoi au serveur
     const ext = f.name.split('.').pop().toLowerCase()
     if (!FORMATS_ACCEPTES.includes(ext)) {
@@ -106,6 +117,7 @@ function FormulaireDataset({ onFermer }) {
     const controleur = new AbortController()
     controleurRef.current = controleur
 
+    // 1a. Premier appel au serveur (en parallèle du second)
     // Suggestions de l'IA (titre, description, catégorie)
     const suggestions = (async () => {
       const form = new FormData()
@@ -126,6 +138,7 @@ function FormulaireDataset({ onFermer }) {
       if (controleurRef.current === controleur) setAnalyse(false)
     })
 
+    // 1b. Second appel au serveur, en même temps que le premier
     // Comparaison avec les jeux déjà publiés par l'utilisateur
     const verificationDoublon = (async () => {
       const form = new FormData()
@@ -141,6 +154,7 @@ function FormulaireDataset({ onFermer }) {
       if (controleurRef.current === controleur) setVerification(false)
     })
 
+    // On attend que les deux réponses soient arrivées
     await Promise.all([suggestions, verificationDoublon])
   }
 
@@ -181,6 +195,7 @@ function FormulaireDataset({ onFermer }) {
 
   async function publier(e) {
     e.preventDefault()
+    // 2. Le formulaire est vérifié : fichier, titre, description et catégorie obligatoires
     if (!fichier) { setErreur('Veuillez sélectionner un fichier.'); return }
     if (!peutPublier) return
     if (!titre.trim()) { setErreur('Le titre est obligatoire.'); return }
@@ -192,10 +207,11 @@ function FormulaireDataset({ onFermer }) {
       const ext = extension
       const nomFichier = titre ? titreVersNomFichier(titre, ext) : fichier.name
       const hash_fichier = comparaison?.hash_fichier ?? null
+      // Nouvelle version d'un jeu existant : l'utilisateur a choisi « mettre à jour »
       const jeuAMettreAJour = choixRequis && choix === 'maj' ? comparaison.jeu : null
 
       const cheminFichier = `${utilisateur.id}/${horodatage()}_${nomFichier}`
-      const { error: erreurUpload } = await supabase.storage.from('jeux-donnees').upload(cheminFichier, fichier)
+      const { error: erreurUpload } = await supabase.storage.from('jeux-donnees').upload(cheminFichier, fichier)  // le fichier part dans le stockage Supabase
       if (erreurUpload) { setErreur(erreurUpload.message); setChargement(false); return }
 
       let jeuId
@@ -216,19 +232,19 @@ function FormulaireDataset({ onFermer }) {
         }
       } else {
         // Nouveau jeu de données
-        const { data: jeu, error: erreurJeu } = await supabase.from('jeux_de_donnees').insert({ titre, description, source, categorie_id: categorieId || null, utilisateur_id: utilisateur.id, hash_fichier, visible: true }).select().single()
+        const { data: jeu, error: erreurJeu } = await supabase.from('jeux_de_donnees').insert({ titre, description, source, categorie_id: categorieId || null, utilisateur_id: utilisateur.id, hash_fichier, visible: true }).select().single()  // le jeu est créé dans la table jeux_de_donnees
         if (erreurJeu) { setErreur(erreurJeu.message); setChargement(false); return }
         jeuId = jeu.id
         await supabase.from('fichiers').insert({ nom_fichier: nomFichier, chemin_stockage: cheminFichier, format: ext, taille: fichier.size, jeu_de_donnees_id: jeuId })
       }
 
-      await supabase.from('analyses').upsert({ fichier_id: jeuId, statut: 'en_attente' }, { onConflict: 'fichier_id' })
+      await supabase.from('analyses').upsert({ fichier_id: jeuId, statut: 'en_attente' }, { onConflict: 'fichier_id' })  // l'analyse est marquée « en attente »
       const formAnalyse = new FormData()
       formAnalyse.append('fichier', fichier)
-      fetch(`${import.meta.env.VITE_API_URL}/analyser?fichier_id=${jeuId}`, { method: 'POST', body: formAnalyse }).catch(() => {})
+      fetch(`${import.meta.env.VITE_API_URL}/analyser?fichier_id=${jeuId}`, { method: 'POST', body: formAnalyse }).catch(() => {})  // LE DÉCLENCHEUR : le fichier est envoyé au serveur, sans attendre la réponse
 
       onFermer()
-      navigate(`/donnees/${jeuId}`)
+      navigate(`/donnees/${jeuId}`)  // la page du jeu s'ouvre tout de suite
     } catch {
       setErreur('Une erreur est survenue.')
       setChargement(false)

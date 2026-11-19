@@ -1,3 +1,8 @@
+// ═══ CHOISIR UN NOUVEAU MOT DE PASSE (adresse /reinitialisation-mdp) ═══
+// On arrive ici depuis le lien reçu par e-mail. Démarche :
+//   1. vérifier que le lien a bien ouvert une session (getSession)
+//   2. enregistrer le nouveau mot de passe (updateUser), puis revenir à l'accueil
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
@@ -45,6 +50,7 @@ export default function ReinitalisationMdp() {
     if (mdp.length < 6) { setErreur('Le mot de passe doit contenir au moins 6 caractères.'); return }
     setErreur('')
     setChargement(true)
+    // 2. Le nouveau mot de passe est enregistré par Supabase Auth
     const { error } = await supabase.auth.updateUser({ password: mdp })
     setChargement(false)
     if (error) { setErreur(traduireErreurAuth(error.message)); return }

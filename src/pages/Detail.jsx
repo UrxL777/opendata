@@ -1,3 +1,10 @@
+// ═══ LA PAGE D'UN JEU DE DONNÉES (adresse /donnees/:id) ═══
+// Démarche :
+//   1. lire le jeu, sa catégorie et ses fichiers (table jeux_de_donnees)
+//   2. RapportNettoyage lit le rapport fait par le serveur (table analyses) ;
+//      tant qu'il n'est pas prêt, RapportEnAttente affiche « en cours » et recharge la page toutes les 30 secondes
+//   3. le téléchargement : lien public du fichier (Storage) + compteur augmenté (fonction SQL compt_tel)
+
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Download, ArrowLeft, ChartColumnBig } from 'lucide-react'
@@ -39,6 +46,7 @@ function RapportNettoyage({ jeuId }) {
   useEffect(() => {
     async function charger() {
       if (!jeuId) { setCharge(false); return }
+      // Le rapport de nettoyage écrit par le serveur (route /analyser), seulement s'il est terminé
       const { data } = await supabase
         .from('analyses')
         .select('resultats')
@@ -103,6 +111,7 @@ export default function Detail() {
 
   useEffect(() => {
     async function charger() {
+      // 1. Le jeu, sa catégorie et ses fichiers, en une seule demande
       const { data } = await supabase
         .from('jeux_de_donnees')
         .select('*, categories(nom, description), fichiers(*)')
@@ -115,6 +124,7 @@ export default function Detail() {
   }, [id])
 
   async function telecharger(fichier) {
+    // 3. Lien public du fichier, ouvert dans un nouvel onglet, puis +1 au compteur de téléchargements
     const { data } = supabase.storage.from('jeux-donnees').getPublicUrl(fichier.chemin_stockage)
     window.open(data.publicUrl, '_blank')
     await supabase.rpc('compt_tel', { id_fichier: fichier.id })

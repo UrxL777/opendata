@@ -1,3 +1,12 @@
+// ═══ UN DASHBOARD (adresse /dashboards/:id) ═══
+// Le dashboard a été construit par le serveur (analyste.py) et enregistré dans la table dashboards.
+// Cette page le LIT : elle ne recalcule rien et n'appelle pas l'IA pour l'afficher.
+// Démarche :
+//   1. lire le jeu et son dashboard (supabase-js) ; s'il est « en préparation », revérifier toutes les 15 secondes
+//   2. afficher : chiffres clés (CarteKpi), graphiques (GraphiqueDashboard → Recharts), conclusion, pistes, colonnes
+//   3. filtres : appliquerFiltres() appelle /dashboard/filtrer ; le serveur relance le SQL avec DuckDB (sans IA)
+//   4. le panneau Atlas (PanneauChat) pour poser des questions
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, ChartColumnBig, MessageCircle, X, Maximize2, Minimize2, Loader2, Clock, CircleAlert, FolderOpen } from 'lucide-react'
@@ -137,6 +146,7 @@ export default function Dashboard() {
   if (chargement) return <p className="text-center py-16 text-texte-discret">Chargement...</p>
   if (!jeu) return <p className="text-center py-16 text-texte-discret">Dashboard introuvable.</p>
 
+  // 2. Le contenu n'est utilisé que si le dashboard est terminé
   const contenu = ligne?.statut === 'termine' ? ligne.contenu : null
   const filtres = contenu?.filtres ?? []
   const effectifMin = contenu?.effectif_min ?? 30
@@ -151,6 +161,7 @@ export default function Dashboard() {
     if (!recalcul) return g.resultat
     return recalcul.graphiques?.find(x => x.id === g.id)?.resultat ?? { colonnes: [], lignes: [] }
   }
+  // Clic sur une barre = filtrer par cette valeur (un 2e clic enlève le filtre)
   const cliquerValeur = (colonne, valeur) => {
     const actuel = choix[colonne] ?? []
     appliquerFiltres({ ...choix, [colonne]: actuel.length === 1 && actuel[0] === valeur ? [] : [valeur] })

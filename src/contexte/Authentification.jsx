@@ -1,3 +1,10 @@
+// ═══ L'UTILISATEUR CONNECTÉ, PARTAGÉ AVEC TOUT LE SITE ═══
+// Démarche :
+//   1. au chargement, getSession() demande à Supabase Auth si quelqu'un est déjà connecté
+//   2. onAuthStateChange() prévient à chaque connexion ou déconnexion
+//   3. l'utilisateur est rangé dans un « contexte » React : toute page le lit avec useAuthentification()
+// Le mot de passe est géré par Supabase, jamais par notre code.
+
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 
@@ -19,11 +26,13 @@ export function FournisseurAuth({ children }) {
   const [chargement, setChargement] = useState(true)
 
   useEffect(() => {
+    // 1. Quelqu'un est-il déjà connecté ? (session gardée par le navigateur)
     supabase.auth.getSession().then(({ data }) => {
       setUtilisateur(data.session?.user ?? null)
       setChargement(false)
     })
 
+    // 2. Être prévenu à chaque connexion ou déconnexion
     const { data: ecouteur } = supabase.auth.onAuthStateChange((_evenement, session) => {
       setUtilisateur(session?.user ?? null)
     })

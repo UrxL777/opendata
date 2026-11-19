@@ -1,3 +1,12 @@
+// ═══ CONNEXION, INSCRIPTION ET MOT DE PASSE OUBLIÉ ═══
+// Tout passe par Supabase Auth (supabase-js) : notre code ne voit ni ne garde jamais les mots de passe.
+// Démarche :
+//   - inscrire() : vérifie le formulaire (verifierInscription) puis signUp ; le pseudo est envoyé avec le compte
+//     et le trigger SQL creer_profil crée la ligne dans la table profiles
+//   - connecter() : signInWithPassword ; deconnecter() : signOut
+//   - reinitialiserMotDePasse() : Supabase envoie un e-mail avec un lien vers /reinitialisation-mdp
+// Une fois connecté, le bouton affiche le pseudo (lu dans la table profiles).
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
@@ -56,6 +65,7 @@ function BoutonUtilisateurConnecte({ utilisateur, onDeconnecter }) {
 
   useEffect(() => {
     async function chargerPseudo() {
+      // Le pseudo de l'utilisateur connecté, lu dans la table profiles
       const { data } = await supabase
         .from('profiles')
         .select('pseudo')
@@ -131,6 +141,7 @@ export default function BoutonConnexion() {
     e.preventDefault()
     setErreur('')
     setChargement(true)
+    // Connexion : Supabase vérifie l'e-mail et le mot de passe
     const { error } = await supabase.auth.signInWithPassword({ email, password: mdp })
     setChargement(false)
     if (error) { setErreur(traduireErreurAuth(error.message)); return }
@@ -143,6 +154,7 @@ export default function BoutonConnexion() {
     const probleme = verifierInscription(pseudo, email, mdp)
     if (probleme) { setErreur(probleme); return }
     setChargement(true)
+    // Inscription : le compte est créé par Supabase, avec le pseudo
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password: mdp,

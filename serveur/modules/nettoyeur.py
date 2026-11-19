@@ -165,7 +165,7 @@ def imputer_valeurs_manquantes(df: pd.DataFrame, colonnes_inspection: list, deci
         debut = f"Colonne '{col}' : {nb_manquants} valeur(s) manquante(s) ({pct} %)"
         choix = choix_atlas.get(col) if isinstance(choix_atlas.get(col), dict) else {}
         raison = str(choix.get("raison") or "").strip()
-        action, regle = _choix_controle(col, choix, roles.get(col, ""), pd.api.types.is_numeric_dtype(df[col]),
+        action, regle = _choix_controle(col, choix, roles.get(col, ""), pd.api.types.is_numeric_dtype(df[col]),  # Python vérifie le choix d'Atlas
                                         pct, colonne_principale)
 
         valeur = None
@@ -183,7 +183,7 @@ def imputer_valeurs_manquantes(df: pd.DataFrame, colonnes_inspection: list, deci
         else:
             if isinstance(valeur, (float, np.floating)):
                 valeur = round(float(valeur), 2)
-            df[col] = df[col].fillna(valeur)
+            df[col] = df[col].fillna(valeur)  # puis l'applique
             nom_action = {"mediane": "la médiane", "moyenne": "la moyenne", "mode": "la valeur la plus fréquente"}[action]
             message = f"{debut}, remplie(s) avec {nom_action} ('{valeur}')."
 
@@ -245,23 +245,23 @@ def nettoyer(df: pd.DataFrame, colonnes_inspection: list, choisir_traitement=Non
     journal = []
 
     # 1 à 4 : les corrections sûres, faites par Python seul
-    df, ops = nettoyer_textes(df)
+    df, ops = nettoyer_textes(df)  # espaces en trop (Python seul)
     journal.extend(ops)
 
-    df, ops = supprimer_colonnes_vides(df)
+    df, ops = supprimer_colonnes_vides(df)  # colonnes vides (Python seul)
     journal.extend(ops)
 
-    df, ops = supprimer_doublons_exacts(df)
+    df, ops = supprimer_doublons_exacts(df)  # doublons (Python seul)
     journal.extend(ops)
 
-    df, ops = convertir_dates(df, colonnes_inspection)
+    df, ops = convertir_dates(df, colonnes_inspection)  # dates harmonisées (Python seul)
     journal.extend(ops)
 
     # 5. Atlas : un seul appel, deux missions (vérifier les rôles, choisir le traitement des cases vides)
     decision = None
     if choisir_traitement is not None:
         try:
-            decision = choisir_traitement(df)
+            decision = choisir_traitement(df)  # Atlas consulté (une seule fois)
         except Exception as e:
             print(f"[NETTOYAGE] Atlas n'a pas pu être consulté : {str(e)[:200]}")
 
@@ -271,11 +271,11 @@ def nettoyer(df: pd.DataFrame, colonnes_inspection: list, choisir_traitement=Non
     journal.extend(ops)
 
     # 7. Python vérifie et applique les choix d'Atlas pour les cases vides
-    df, ops = imputer_valeurs_manquantes(df, colonnes_inspection, decision)
+    df, ops = imputer_valeurs_manquantes(df, colonnes_inspection, decision)  # Python applique
     journal.extend(ops)
 
     # 8. Signaler les valeurs extrêmes (sans les modifier)
-    anomalies = detecter_anomalies(df, colonnes_inspection)
+    anomalies = detecter_anomalies(df, colonnes_inspection)  # signalées, pas modifiées
 
     # Le résultat : le tableau propre, le journal des opérations, les anomalies et les rôles d'Atlas
     return {

@@ -125,16 +125,16 @@ def mettre_en_file(jeu_id: str) -> None:
         if jeu_id in _dans_la_file:
             return
         _dans_la_file.add(jeu_id)
-    _file_dashboards.put(jeu_id)
+    _file_dashboards.put(jeu_id)  # le jeu entre dans la file
 
 
 def preparer_dashboard(jeu_id: str, df_propre: pd.DataFrame, hash_fichier: str | None) -> None:
     """Appelée par /analyser après le rapport : range le jeu propre, puis réutilise ou met en file."""
     jeu_id = str(jeu_id)
     # 1. Ranger le jeu propre (Parquet) dans le stockage Supabase
-    chemin = enregistrer_fichier_propre(df_propre, jeu_id)
+    chemin = enregistrer_fichier_propre(df_propre, jeu_id)  # fichier propre en Parquet
     # 2. Un jeu au contenu identique a déjà un dashboard ? On le réutilise, sans appeler l'IA
-    existant = _dashboard_meme_contenu(jeu_id, hash_fichier)
+    existant = _dashboard_meme_contenu(jeu_id, hash_fichier)  # déjà fait ? réutilisé, 0 token
     if existant:
         _maj_dashboard(jeu_id, statut="termine", fiche=existant["fiche"], contenu=existant["contenu"],
                        chemin_propre=chemin, erreur=None)
@@ -142,7 +142,7 @@ def preparer_dashboard(jeu_id: str, df_propre: pd.DataFrame, hash_fichier: str |
         return
     # 3. Sinon : statut « en attente », puis mise dans la file
     _maj_dashboard(jeu_id, statut="en_attente", chemin_propre=chemin, erreur=None)
-    mettre_en_file(jeu_id)
+    mettre_en_file(jeu_id)  # sinon, mis dans la file
     print(f"[DASHBOARD] Jeu {jeu_id} mis en file d'attente ({_file_dashboards.qsize()} en attente)")
 
 
@@ -165,10 +165,10 @@ def _creer_dashboard(jeu_id: str) -> None:
     except Exception:
         pass
     # 3. Python écrit la fiche d'identité, puis analyste.py (Atlas) construit le dashboard
-    fiche = fiche_identite(pd.read_parquet(chemin_local), infos.get("titre") or "", infos.get("description") or "", roles_atlas)
-    dashboard = analyser_dataset(fiche, chemin_local)
+    fiche = fiche_identite(pd.read_parquet(chemin_local), infos.get("titre") or "", infos.get("description") or "", roles_atlas)  # fiche du jeu propre
+    dashboard = analyser_dataset(fiche, chemin_local)  # L'ANALYSTE (analyste.py)
     # 4. Enregistrer le dashboard dans la table dashboards : le site n'aura plus qu'à le lire
-    _maj_dashboard(jeu_id, statut="termine", fiche=_nettoyer_nan(fiche), contenu=_nettoyer_nan(dashboard), erreur=None)
+    _maj_dashboard(jeu_id, statut="termine", fiche=_nettoyer_nan(fiche), contenu=_nettoyer_nan(dashboard), erreur=None)  # enregistré dans dashboards
     print(f"[DASHBOARD] ✓ Jeu {jeu_id} : dashboard enregistré")
 
 
@@ -176,9 +176,9 @@ def _travailleur_dashboards() -> None:
     """Fil de travail séparé : prend les jeux dans la file, un par un, pour toujours."""
     while True:
         # Attend qu'un jeu arrive dans la file, puis crée son dashboard ; une erreur est notée sans arrêter le fil
-        jeu_id = _file_dashboards.get()
+        jeu_id = _file_dashboards.get()  # il prend le jeu suivant
         try:
-            _creer_dashboard(jeu_id)
+            _creer_dashboard(jeu_id)  # et crée son dashboard
         except Exception as e:
             print(f"[DASHBOARD] ✗ Jeu {jeu_id} : {traceback.format_exc()}")
             try:
@@ -271,7 +271,7 @@ async def _tache_reanalyse():
 async def lifespan(app: FastAPI):
     # Au démarrage du serveur : on lance la relance automatique (toutes les 5 min) et le fil des dashboards
     tache = asyncio.create_task(_tache_reanalyse())
-    threading.Thread(target=_travailleur_dashboards, daemon=True).start()
+    threading.Thread(target=_travailleur_dashboards, daemon=True).start()  # fil lancé au démarrage
     yield
     tache.cancel()  # arrêt propre de la relance automatique quand le serveur s'arrête
 
@@ -363,12 +363,12 @@ async def analyser(
     suffixe = os.path.splitext(fichier.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffixe) as tmp:
         shutil.copyfileobj(fichier.file, tmp)
-        chemin_tmp = tmp.name
+        chemin_tmp = tmp.name  # copie temporaire du fichier
 
     try:
         # Étape 2 : l'empreinte (hash MD5) du contenu : deux fichiers au même contenu ont la même, même dans un autre format
         extension = suffixe.lower().strip(".")
-        hash_fichier = hash_contenu_dataframe(chemin_tmp, extension) or calculer_hash(chemin_tmp, extension)
+        hash_fichier = hash_contenu_dataframe(chemin_tmp, extension) or calculer_hash(chemin_tmp, extension)  # empreinte MD5
         fichier_id_existant = None
         print(f"[ANALYSER] Hash calculé : {hash_fichier}")
         # Étape 3 : cet utilisateur a-t-il déjà publié ce contenu ? Alors on met à jour son jeu au lieu d'en créer un
@@ -385,7 +385,7 @@ async def analyser(
 
         # Étape 4 : inspecteur.py examine le fichier (colonnes, rôles, cases vides, doublons) → inspection
         print(f"[ANALYSER] Lancement de l'inspection...")
-        inspection = inspecter(chemin_tmp, fichier.filename)
+        inspection = inspecter(chemin_tmp, fichier.filename)  # INSPECTION (inspecteur.py)
         print(f"[ANALYSER] Inspection terminée : lisible={inspection.get('lisible')} | erreur={inspection.get('erreur')}")
 
         if not inspection.get("lisible"):
@@ -394,7 +394,7 @@ async def analyser(
         print(f"[ANALYSER] Dimensions : {inspection.get('nb_lignes')} lignes × {inspection.get('nb_colonnes')} colonnes")
 
         # Étape 5 : lire le fichier dans un tableau pandas (df), qui va être nettoyé
-        df = lire_fichier(chemin_tmp, fichier.filename)
+        df = lire_fichier(chemin_tmp, fichier.filename)  # le tableau pandas
         print(f"[ANALYSER] DataFrame chargé : {df.shape}")
 
         # Étape 6 : préparer la décision d'Atlas. decision_atlas sera appelée PAR le nettoyeur, au bon moment
@@ -408,13 +408,13 @@ async def analyser(
             except Exception:
                 pass
 
-        def decision_atlas(df_presque_propre):
-            fiche = fiche_identite(df_presque_propre, infos_jeu.get("titre") or fichier.filename, infos_jeu.get("description") or "")
-            return choisir_traitement_manquants(fiche)
+        def decision_atlas(df_presque_propre):  # ce que le nettoyeur appellera
+            fiche = fiche_identite(df_presque_propre, infos_jeu.get("titre") or fichier.filename, infos_jeu.get("description") or "")  # des statistiques, pas les données
+            return choisir_traitement_manquants(fiche)  # Atlas décide (agent.py)
 
         # Étape 7 : nettoyeur.py nettoie (et consulte Atlas), puis rapport.py résume ce qui a été fait
-        nettoyage = nettoyer(df, inspection["colonnes"], decision_atlas)
-        rapport = generer_rapport(inspection, nettoyage)
+        nettoyage = nettoyer(df, inspection["colonnes"], decision_atlas)  # NETTOYAGE
+        rapport = generer_rapport(inspection, nettoyage)  # RAPPORT
         rapport["roles_atlas"] = nettoyage.get("roles_atlas") or {}  # repris par le dashboard
 
         # Étape 8 : ce qui sera enregistré : l'inspection, le rapport et un aperçu des premières lignes
@@ -429,7 +429,7 @@ async def analyser(
         if id_a_sauvegarder:
             print(f"[ANALYSER] Sauvegarde en base pour fichier_id={id_a_sauvegarder}...")
             resultats_propres = _nettoyer_nan(resultats)
-            supabase.table("analyses").upsert(
+            supabase.table("analyses").upsert(  # enregistré, statut « termine »
                 {"fichier_id": id_a_sauvegarder, "statut": "termine", "resultats": resultats_propres},
                 on_conflict="fichier_id"
             ).execute()
@@ -442,7 +442,7 @@ async def analyser(
             # Étape 10 : préparer le dashboard (Parquet + file d'attente) ; il sera créé en arrière-plan
             # Dashboard automatique : jamais bloquant pour le rapport, qui est déjà enregistré
             try:
-                preparer_dashboard(id_a_sauvegarder, nettoyage["df_nettoye"], hash_fichier)
+                preparer_dashboard(id_a_sauvegarder, nettoyage["df_nettoye"], hash_fichier)  # vers le dashboard
             except Exception:
                 print(f"[DASHBOARD] ✗ Préparation impossible : {traceback.format_exc()}")
         else:

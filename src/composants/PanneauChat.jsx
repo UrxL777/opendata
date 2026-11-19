@@ -1,3 +1,10 @@
+// ═══ LE CHAT AVEC ATLAS (à droite du dashboard) ═══
+// Démarche :
+//   1. la conversation est gardée dans sessionStorage (le temps de la visite), une par jeu de données
+//   2. envoyerMessage() envoie TOUT l'historique à /chat : c'est la mémoire d'Atlas
+//   3. le serveur lit le jeu et son dashboard dans Supabase, Atlas répond (Groq)
+//   4. la réponse s'affiche, mise en forme par react-markdown (listes, gras, code)
+
 import { useEffect, useState, useRef } from 'react'
 import { Send } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -8,6 +15,7 @@ import remarkGfm from 'remark-gfm'
 export default function PanneauChat({ jeuId, estMobile }) {
   const cleStockage = `chat_${jeuId}`
 
+  // 1. Au chargement : on reprend la conversation gardée pour ce jeu, s'il y en a une
   const [messages, setMessages] = useState(() => {
     try {
       const sauvegardes = sessionStorage.getItem(`chat_${jeuId}`)
@@ -34,11 +42,13 @@ export default function PanneauChat({ jeuId, estMobile }) {
   async function envoyerMessage() {
     const texte = saisie.trim()
     if (!texte || chargement) return
+    // 2. Le message de l'utilisateur s'affiche tout de suite
     const nouveauxMessages = [...messages, { role: 'user', contenu: texte }]
     setMessages(nouveauxMessages)
     setSaisie('')
     setChargement(true)
     try {
+      // 3. Tout l'historique part au serveur, qui fait répondre Atlas
       const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,6 +58,7 @@ export default function PanneauChat({ jeuId, estMobile }) {
         })
       })
       const donnees = await res.json()
+      // 4. La réponse d'Atlas s'ajoute à la conversation
       setMessages(prev => [...prev, { role: 'assistant', contenu: donnees.reponse }])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', contenu: 'Erreur de connexion au serveur.' }])

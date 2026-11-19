@@ -1,3 +1,5 @@
+// ═══ LE LOGO D'OPENDATA (icône + nom), réutilisé dans le menu et le pied de page ═══
+
 export default function LogOpenData({ tailleIcone = 26, tailleTexte = '1.25rem', couleurTexte = '#111827', mode = 'clair', afficherTexte = true }) {
   const c = mode === 'sombre'
     ? { anneau: '#60A5FA', barre1: '#93C5FD', barre2: '#BFDBFE', barre3: '#93C5FD' }

@@ -1,3 +1,11 @@
+// ═══ UN GRAPHIQUE DU DASHBOARD (dessiné par Recharts) ═══
+// Le serveur a déjà calculé les données (le SQL d'Atlas exécuté par DuckDB) ; ce fichier les DESSINE.
+// Démarche :
+//   1. preparerDonnees() : transforme le résultat SQL (colonnes + lignes) en données pour Recharts
+//   2. choisir la forme : barres, barres horizontales (beaucoup de groupes ou noms longs) ou courbe
+//   3. axes arrondis (axeArrondi), noms coupés sur plusieurs lignes, couleurs de index.css
+//   4. une bulle au survol (Bulle) ; un clic sur une barre peut filtrer le dashboard (filtreDuGraphique)
+
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -143,6 +151,7 @@ function Bulle({ active, payload, label, graphique, effectifMin }) {
 }
 
 export default function GraphiqueDashboard({ graphique, resultat, numero, effectifMin = 30, filtres = [], onCliquerValeur, compact = false }) {
+  // 1. Les données du graphique, prêtes pour Recharts
   const preparees = preparerDonnees(graphique, resultat)
   const donnees = preparees.donnees
   // Une couleur par série, jamais deux fois la même : au-delà de 6, on garde les 6 séries qui ont le plus de lignes
