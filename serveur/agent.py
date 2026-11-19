@@ -243,7 +243,7 @@ def construire_contexte(jeu_id: str) -> str:
                     print(f"[AGENT] Rapport trouvé : {rapport.get('nb_lignes')} lignes × {rapport.get('nb_colonnes')} colonnes | {len(apercu)} lignes d'aperçu")
                     break
             else:
-                print(f"[AGENT] Aucun rapport d'analyse disponible")
+                print("[AGENT] Aucun rapport d'analyse disponible")
         except Exception as e:
             print(f"[AGENT] ✗ Erreur récupération analyse : {e}")
 
@@ -372,7 +372,7 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
         # 4. Python extrait le JSON ; si Atlas a mal répondu, le nom du fichier sert de titre
         match = re.search(r'\{.*\}', contenu, re.DOTALL)
         if not match:
-            print(f"[SUGGERER-AGENT] ✗ Aucun JSON trouvé, fallback")
+            print("[SUGGERER-AGENT] ✗ Aucun JSON trouvé, fallback")
             return {"titre": nom_fichier, "description": "Aucune description générée.", "categorie_id": None}
 
         resultat = json.loads(match.group())
@@ -395,7 +395,7 @@ def suggerer(chemin: str, nom_fichier: str) -> dict:
                     print(f"[SUGGERER-AGENT] ✓ Nouvelle catégorie créée : id={nouvel_id}")
                     resultat["categorie_id"] = nouvel_id
                 else:
-                    print(f"[SUGGERER-AGENT] ✗ Échec insertion catégorie")
+                    print("[SUGGERER-AGENT] ✗ Échec insertion catégorie")
                     resultat["categorie_id"] = None
 
             del resultat["nouvelle_categorie"]

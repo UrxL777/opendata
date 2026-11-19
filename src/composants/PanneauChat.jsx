@@ -59,9 +59,11 @@ export default function PanneauChat({ jeuId, estMobile }) {
       })
       const donnees = await res.json()
       // 4. La réponse d'Atlas s'ajoute à la conversation
+      // Le serveur a eu un problème (ex. l'IA indisponible) : on l'affiche au lieu d'une bulle vide
+      if (!res.ok || !donnees.reponse) throw new Error()
       setMessages(prev => [...prev, { role: 'assistant', contenu: donnees.reponse }])
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', contenu: 'Erreur de connexion au serveur.' }])
+      setMessages(prev => [...prev, { role: 'assistant', contenu: 'Atlas n’a pas pu répondre pour le moment. Réessaie dans un instant.' }])
     } finally {
       setChargement(false)
     }

@@ -93,10 +93,10 @@ function FormulaireDataset({ onFermer }) {
 
   async function choisirFichier(f) {
     if (!f) return
+    // 1. Le fichier choisi : on annule les demandes en cours pour un fichier précédent, et on vide le formulaire
     if (controleurRef.current) controleurRef.current.abort()
     viderFormulaire()
 
-    // 1. Le fichier choisi : on annule les demandes en cours pour un fichier précédent, et on vide le formulaire
     // Format et taille vérifiés avant tout envoi au serveur
     const ext = f.name.split('.').pop().toLowerCase()
     if (!FORMATS_ACCEPTES.includes(ext)) {
